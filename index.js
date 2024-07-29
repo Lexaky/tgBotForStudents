@@ -1,5 +1,6 @@
 const TelegramBot = require('node-telegram-bot-api');
-const { Sequelize, DataTypes } = require('sequelize');
+const cron = require('node-cron');
+const { Sequelize, DataTypes, QueryTypes, Op } = require('sequelize');
 const sequelize = new Sequelize('tg', 'root', '12345', {
     host: 'localhost',
     dialect: 'mysql',
@@ -75,7 +76,19 @@ const Subjects = sequelize.define('Subjects', {
     SUBJECT_NAME: {
         type: DataTypes.STRING(255),
         allowNull: false
-    }
+    },
+	GROUP_ID: {
+		type: DataTypes.INTEGER,
+		allowNull: false
+	},
+	IS_APPROVED: {
+		type: DataTypes.BOOLEAN,
+		defaultValue: false
+	},
+	CREATOR_TELEGRAM_ID: {
+		type: DataTypes.INTEGER,
+		allowNull: false
+	}
 }, {
     tableName: 'SUBJECTS',
     timestamps: false
@@ -116,20 +129,25 @@ const Tasks = sequelize.define('Tasks', {
     },
     GROUP_ID: {
         type: DataTypes.INTEGER,
+		allowNull: true,
         defaultValue: null
     },
     SUBJECT_ID: {
-        type: DataTypes.INTEGER
+        type: DataTypes.INTEGER,
+		allowNull: true,
+		defaultValue: null
     },
     TITLE: {
         type: DataTypes.STRING(255),
-        allowNull: false
+		allowNull: false
     },
     DESCRIPTION: {
-        type: DataTypes.TEXT
+        type: DataTypes.TEXT,
+		allowNull: false
     },
     DEADLINE: {
-        type: DataTypes.DATE
+        type: DataTypes.DATE,
+		allowNull: true
     },
     IS_COMPLETED: {
         type: DataTypes.BOOLEAN,
@@ -138,7 +156,11 @@ const Tasks = sequelize.define('Tasks', {
     CREATED_AT: {
         type: DataTypes.DATE,
         defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
-    }
+    },
+	FOR_ALL: {
+		type: DataTypes.BOOLEAN,
+		defaultValue: false
+	}
 }, {
     tableName: 'TASKS',
     timestamps: false
@@ -210,13 +232,16 @@ const Notifications = sequelize.define('Notifications', {
         primaryKey: true
     },
     USER_ID: {
-        type: DataTypes.INTEGER
+        type: DataTypes.INTEGER,
+		allowNull: true
     },
     TASK_ID: {
-        type: DataTypes.INTEGER
+        type: DataTypes.INTEGER,
+		allowNull: true
     },
     EVENT_ID: {
-        type: DataTypes.INTEGER
+        type: DataTypes.INTEGER,
+		allowNull: true
     },
     NOTIFICATION_DATE: {
         type: DataTypes.DATE
@@ -282,11 +307,7 @@ sequelize.sync({force: true}).then(result=>{
 const token = '7345012579:AAEpRCqweK2FLpRMfILGIf4Y9geDkpGdlHw';
 const bot = new TelegramBot(token, { polling: true });
 
-//Необходимо добавить кнопку "Уведомления" в главное меню, которая доступна только администраторам
-//Необходимо добавить кнопку "Создать мероприятие" в главное меню, которая доступна только администраторам
-
 //Все нижеперечисленные действия осуществляются для функции handleMyGroupsInfo()
-//Добавить меню для групп, в которые вступил пользователь. Для этого в каждой группе должно быть своё меню.
 //В меню группы должны быть кнопки "Расписание занятий", "Актуальные задачи", "Создать учебный предмет" (только куратор),
 //"Добавить задачу", "Добавить предмет в расписание", "Заявки на задачи" (только куратор), "Заявки на вступление в группу" (только куратор),
 //"Список учебных предметов" с последующими кнопками удаления существующих предметов (только куратор), "Уведомения для группы" (только куратор).
@@ -296,6 +317,7 @@ const bot = new TelegramBot(token, { polling: true });
 
 
 // Функция для отображения главного меню
+// *Доработать действия при нажатии на "Уведомления".
 const showMainMenu = (chatId) => {
     bot.sendMessage(chatId, 'Главное меню', {
         reply_markup: {
@@ -303,21 +325,23 @@ const showMainMenu = (chatId) => {
                 [{ text: 'Создать группу' }],
                 [{ text: 'Заявки на создание групп' }, { text: 'Информация о моих группах' }],
                 [{ text: 'Вступить в группу' }],
-				[{ text: 'Уведомления' }, { text: 'Мероприятия' }]
+                [{ text: 'Уведомления' }, { text: 'Мероприятия' }]
             ]
         }
     });
 };
 
-const showGroupInfo = (chatId, groupId) => {
-    bot.sendMessage(chatId, 'Главное меню группы', {
+const showGroupInfo = async (chatId, groupId) => {
+	console.log('Открытие меню для группы с id: ' + groupId);
+	const grName = await GroupStud.findOne({where: {GROUP_ID: groupId}});
+    bot.sendMessage(chatId, 'Главное меню группы ' + grName.GROUP_NAME, {
         reply_markup: {
-            keyboard: [
-                [{ text: 'Расписание занятий' }],
-                [{ text: 'Актуальные задачи' }, { text: 'Добавить задачу' }],
-                [{ text: 'Добавить учебный предмет' }, { text: 'Заявки на задачи для группы' }],
-				[{ text: 'Список учебных предметов' }, {text: 'Заявки на вступление в группу'}],
-				[{ text: 'Список учебных предметов' }, {text: 'Заявки на вступление в группу'}]
+            inline_keyboard: [
+                [{ text: 'Расписание занятий', callback_data: `show_schedule_${groupId}` }, { text: 'Главное меню', callback_data: `back_main` }],
+                [{ text: 'Актуальные задачи', callback_data: `actual_tasks_${groupId}` }, { text: 'Добавить задачу', callback_data: `add_task_${groupId}` }],
+                [{ text: 'Добавить учебный предмет', callback_data: `add_subject_${groupId}` }, { text: 'Заявки на задачи для группы', callback_data: `requests_tasks_${groupId}` }],
+				[{ text: 'Список учебных предметов', callback_data: `subject_list_${groupId}` }, { text: 'Заявки на вступление в группу', callback_data: `requests_join_${groupId}` }],
+				[{ text: 'Отправить уведомление группе', callback_data: `send_notification_${groupId}` }]
             ]
         }
     });
@@ -341,7 +365,6 @@ bot.onText(/\/start/, async (msg) => {
                 }
             });
         }
-
         showMainMenu(chatId);
     } catch (error) {
         console.error('Error in /start command:', error);
@@ -362,19 +385,75 @@ bot.on('message', (msg) => {
     } else if (text === 'Вступить в группу') {
         handleJoinGroup(chatId);
     } else if (text === 'Уведомления') {
-		
-	} else if (text == 'Мероприятия')
+		handleNotification(chatId);
+	} else if (text == 'Мероприятия') {
+		handleEvent(chatId);
+	}
 });
 
 // Функция для создания уведомлений для всех пользователей от админов
 const handleNotification = async (chatId) => {
-	
+	const usr = Users.findOne({where: {TELEGRAM_ID: chatId}});
+	if (!usr) {
+		bot.sendMessage(chatId, 'Пользователь не существует!');
+	} else {
+		if (usr.ROLE_GLOBAL === 'admin') {
+			//Пользователь админ --> выбор кому присылать уведомления
+			bot.sendMessage(chatId, 'Выберите кому прислать уведомление', {
+				reply_markup: {
+				inline_keyboard: [
+					[{ text: 'Уведомить всех', callback_data: `alarm_all` }], 
+					[{ text: 'Уведомить группу', callback_data: `alarm_group` }],
+					[{ text: 'Уведомить пользователя', callback_data: `alarm_user` }],
+					[{text: 'Назад', callback_data: `back_main`}]
+				]
+				}
+			});
+		} else {
+			//Недостаточно прав
+			console.log('Пользователю с тг ' + chatId + ' недостаточно прав для входа в уведомления');
+			bot.sendMessage(chatId, 'Недостаточно прав для доступа к уведомлениям');
+		}
+	}
+	showMainMenu(chatId);
+	return;
 }
 
 // Функция для вывода существующих мероприятий и создания мероприятий админами
 const handleEvent = async (chatId) => {
-	
-}
+    try {
+        // Найти пользователя по TELEGRAM_ID
+        const user = await Users.findOne({ where: { TELEGRAM_ID: chatId } });
+
+        if (!user) {
+            bot.sendMessage(chatId, 'Ваш аккаунт не найден в системе.');
+            return;
+        }
+
+        // Проверка на права пользователя
+        if (user.ROLE_GLOBAL === 'user') {
+            bot.sendMessage(chatId, 'У вас недостаточно прав для доступа к мероприятиям.');
+            return;
+        }
+
+        if (user.ROLE_GLOBAL === 'admin') {
+            bot.sendMessage(chatId, 'Выберите действие:', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'Показать все мероприятия', callback_data: 'show_all_events' }],
+                        [{ text: 'Создать мероприятие', callback_data: 'create_event' }],
+                        [{ text: 'Назад', callback_data: 'back_main' }]
+                    ]
+                }
+            });
+        }
+		return;
+    } catch (error) {
+        console.error('Ошибка при обработке событий:', error);
+        bot.sendMessage(chatId, 'Произошла ошибка при обработке событий.');
+		return;
+    }
+};
 
 // Функция для обработки создания группы
 const handleCreateGroup = async (chatId) => {
@@ -774,30 +853,229 @@ bot.on('callback_query', async (callbackQuery) => {
 			showMainMenu(chatId);
 		}
 	}
-	
+	else if (action === 'show_all_events') {
+        try {
+            const currentDate = new Date().toISOString().split('T')[0]; // Получаем текущую дату в формате YYYY-MM-DD
+
+			const events = await sequelize.query(
+			'SELECT * FROM EVENTS WHERE EVENT_DATE >= :currentDate',
+			{
+				replacements: { currentDate },
+				type: QueryTypes.SELECT
+			});
+
+            if (events.length === 0) {
+                bot.sendMessage(chatId, 'Нет предстоящих мероприятий.');
+            } else {
+                const eventMessages = events.map(event => {
+                    return `Название: ${event.EVENT_NAME}\nДата: ${event.EVENT_DATE}\nВремя: ${event.EVENT_TIME}\nМесто: ${event.LOCATION}\nОписание: ${event.DESCRIPTION}`;
+                }).join('\n\n');
+
+                bot.sendMessage(chatId, `Предстоящие мероприятия:\n\n${eventMessages}`);
+            }
+			showMainMenu(chatId);
+			return;
+        } catch (error) {
+            console.error('Ошибка при получении мероприятий:', error);
+            bot.sendMessage(chatId, 'Произошла ошибка при получении мероприятий.');
+			showMainMenu(chatId);
+			return;
+        }
+    } 
+	else if (action === 'create_event') {
+        bot.sendMessage(chatId, 'Напишите в чате следующее:\n[Название мероприятия]\n[Дата проведения мероприятия]\n[Время проведения мероприятия]\n[Место проведения мероприятия]\n[Описание мероприятия]');
+		bot.sendMessage(chatId, "Пример:\nСбор разработчиков приложений\n2024-12-31\n18:00:00\nГлавный зал\nСбор разработчиков для подведения итогов");
+		bot.sendMessage(chatId, "Введите 'Назад' для возврата в главное меню");
+        bot.once('message', async (msg) => {
+			if (msg.text === 'Назад' || msg.text === 'назад')
+			{
+				showMainMenu(chatId);
+				return;
+			}
+            const eventDetails = msg.text.split('\n');
+			
+			if (eventDetails.length !== 5) {
+                bot.sendMessage(chatId, 'Неправильный формат данных. Попробуйте снова.');
+                handleEvent(chatId);
+                return;
+            }
+
+            const [eventName, eventDate, eventTime, location, description] = eventDetails;
+
+            // Проверка формата даты и времени
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate) || !/^\d{2}:\d{2}:\d{2}$/.test(eventTime)) {
+                bot.sendMessage(chatId, 'Неправильный формат даты или времени. Попробуйте снова.\nПример:\nСбор разработчиков приложений\n2024-12-31\n18:00:00\nГлавный зал\nСбор разработчиков для подведения итогов');
+                handleEvent(chatId);
+                return;
+            }
+
+            const now = new Date();
+            const eventDateTime = new Date(`${eventDate}T${eventTime}`);
+
+            if (eventDateTime <= now) {
+                bot.sendMessage(chatId, 'Дата и время мероприятия не могут быть в прошлом. Попробуйте снова.');
+                handleEvent(chatId);
+                return;
+            }
+
+            try {
+                await Events.create({
+                    EVENT_NAME: eventName,
+                    EVENT_DATE: eventDate,
+                    EVENT_TIME: eventTime,
+                    LOCATION: location,
+                    DESCRIPTION: description
+                });
+
+                bot.sendMessage(chatId, 'Мероприятие успешно создано.');
+                showMainMenu(chatId);
+				return;
+            } catch (error) {
+                console.error('Ошибка при создании мероприятия:', error);
+                bot.sendMessage(chatId, 'Произошла ошибка при создании мероприятия.');
+                handleEvent(chatId);
+				return;
+            }
+			return;
+        });
+		return;
+    } 
+	else if (action === 'back_main') {
+        showMainMenu(chatId);
+		return;
+    }
+	else if (action.startsWith('show_group_menu_')) { // +
+		const grId = parseInt(action.replace('show_group_menu_', ''));
+		showGroupInfo(chatId, grId);
+	} 
+	else if (action.startsWith('show_schedule_')) { // -
+		const grId = parseInt(action.replace('show_schedule', '')); //group id
+		
+	}
+	else if (action.startsWith('actual_tasks_')) { // -
+		const grId = parseInt(action.replace('actual_tasks_', '')); //group id
+		const tasks = Tasks.findAll({where: {IS_COMPLETED: false}});
+		
+	}
+	else if (action.startsWith('add_task_')) { // ?? -
+		const grId = parseInt(action.replace('add_task_', '')); //group id
+		bot.sendMessage(chatId, 'Введите информацию о вашей задаче, согласно шаблону:');
+		bot.sendMessage(chatId, '[Заголовок задачи]\n[Описание задачи]\n[Дата дедлайна YYYY-MM-DD]');
+		bot.sendMessage(chatId, 'Пример:\nЗакончить проект по математике\nЗакончить проект, связанный с докладом по математике\n2024-12-31');
+		bot.sendMessage(chatId, 'Введите "Назад", чтобы вернуться обратно');
+		bot.once('message', async (msg) => {
+			if (msg.text === 'Назад' || msg.text === 'назад')
+			{
+				showGroupInfo(chatId, grId);
+				return;
+			}
+            const eventDetails = msg.text.split('\n');
+			
+			if (eventDetails.length !== 3) {
+                bot.sendMessage(chatId, 'Неправильный формат данных. Попробуйте снова.');
+                showGroupInfo(chatId, grId);
+                return;
+            } else {
+				try {
+					const usr = Users.findOne({where: {TELEGRAM_ID: chatId}});
+					if (!usr) {
+						bot.sendMessage(chatId, 'Пользователь не найден');
+					}
+					const userId = parseInt(usr.USER_ID);
+					// Проверка формата даты
+					if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDetails[2])) {
+						bot.sendMessage(chatId, 'Неправильный формат даты. Попробуйте снова.\nПример:\nЗакончить проект по математике\nЗакончить проект, связанный с докладом по математике\n2024-12-31');
+					} else {
+						await Tasks.create ({
+							USER_ID: userId,
+							TITLE: eventDetails[0],
+							DESCRIPTION: eventDetails[1],
+							DEADLINE: eventDetails[2]
+						});
+						console.log('Успешна задана задача с заголовком "' + eventDetails[0] + '", и содержанием "' + eventDetails[1] + '"');
+						bot.sendMessage(chatId, 'Успешна задана задача с заголовком "' + eventDetails[0] + '", и содержанием "' + eventDetails[1] + '"');
+					}
+				} catch (error) {
+					console.log('Ошибка при задании Task в таблицу Tasks');
+					bot.sendMessage(chatId, 'Ошибка при создании задачи!');
+				}
+				showGroupInfo(chatId, grId);
+				return;
+			}
+		});
+		
+	}
+	else if (action.startsWith('add_subject_')) { // -
+		const grId = parseInt(action.replace('add_subject_', '')); //group id
+		bot.sendMessage(chatId, 'Введите название нового предмета (введите "Назад" чтобы вернуться): ');
+		bot.once('message', async (msg) => {
+			try {
+			if (msg.text === 'Назад' || msg.text === 'назад') {
+				showGroupInfo(chatIt, grId);
+			} else {
+				//Введено название предмета
+				bot.sendMessage(chatId, 'Предмет: ' + msg.text);
+				
+			}
+			} catch (error) {
+				console.log('Ошибка при задании учебного предмета');
+				bot.sendMessage(chatId, 'Ошибка при задании учебного предмета');
+			}
+		});
+		showGroupInfo(chatId, grId);
+		return;
+	}
+	else if (action.startsWith('requests_tasks_')) { // - ez
+		const grId = parseInt(action.replace('requests_tasks_', '')); //group id
+		
+	}
+	else if (action.startsWith('subject_list_')) { // - hard
+		const grId = parseInt(action.replace('subject_list_', '')); //group id
+		
+	}
+	else if (action.startsWith('requests_join_')) { // - ez
+		const grId = parseInt(action.replace('requests_join_', '')); //group id
+		
+	}
+	else if (action.startsWith('send_notification_')) { // - ez
+		const grId = parseInt(action.replace('send_notification_', '')); //group id
+		
+	}
 });
 
 // Функция для обработки информации о моих группах
 const handleMyGroupsInfo = async (chatId) => {
     const telegramId = chatId;
-	console.log(chatId);
-	const user = await Users.findOne({ where: { TELEGRAM_ID: telegramId } });
-	if (!user) {
-            bot.sendMessage(chatId, 'Ваш аккаунт не найден в системе.');
-            return;
-        }
+    const user = await Users.findOne({ where: { TELEGRAM_ID: telegramId } });
+
+    if (!user) {
+        bot.sendMessage(chatId, 'Ваш аккаунт не найден в системе.');
+        return;
+    }
+
     const userGroups = await UserGroups.findAll({ where: { USER_ID: user.USER_ID } });
 
     if (userGroups.length === 0) {
         bot.sendMessage(chatId, 'Вы не состоите ни в одной группе.');
-		return;
+        return;
     } else {
-        let message = 'Информация о ваших группах:\n';
+        // Создание кнопок для каждой группы
+        const keyboard = [];
         for (const userGroup of userGroups) {
-            const group = GroupStud.findOne({ where: { GROUP_ID: userGroup.GROUP_ID } });
-            message += `- ${group.GROUP_NAME}\n`;
+            const group = await GroupStud.findOne({ where: { GROUP_ID: userGroup.GROUP_ID } });
+            if (group) {
+                keyboard.push([{ text: group.GROUP_NAME, callback_data: `show_group_menu_${group.GROUP_ID}` }]);
+            }
         }
-        bot.sendMessage(chatId, message);
+        
+        keyboard.push([{ text: 'Назад', callback_data: 'back_main' }]);
+
+        // Отправляем кнопки
+        bot.sendMessage(chatId, 'Список ваших учебных групп:', {
+            reply_markup: {
+                inline_keyboard: keyboard
+            }
+        });
     }
 };
 
@@ -831,6 +1109,57 @@ const handleJoinGroup = async (chatId) => {
         console.error('Ошибка при получении списка учебных групп', error);
         bot.sendMessage(chatId, 'Произошла ошибка при получении списка учебных групп.');
 		showMainMenu(chatId);
+		return;
     }
 };
 
+// Функция для отправки уведомления о мероприятии
+const sendNotificationEvent = async (userId, message) => {
+    try {
+        await bot.sendMessage(userId, message);
+    } catch (error) {
+        console.error('Ошибка при отправке уведомления:', error);
+    }
+};
+
+// Функция для проверки и отправки уведомлений о мероприятиях
+const checkAndSendNotificationsEvents = async (daysBefore) => {
+    try {
+	const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + daysBefore);
+
+    // Форматируем дату в YYYY-MM-DD для сравнения
+    const formattedDate = targetDate.toISOString().split('T')[0];
+
+    // Получаем все мероприятия, которые состоятся через `daysBefore` дней
+    const events = await Events.findAll({
+        where: {
+            EVENT_DATE: {
+                [Op.eq]: formattedDate
+            }
+        }
+    });
+
+    // Получаем всех пользователей
+    const users = await Users.findAll();
+
+    // Отправляем уведомления каждому пользователю
+    for (const event of events) {
+        const message = `Напоминание о мероприятии: ${event.EVENT_NAME}\nДата: ${event.EVENT_DATE}\nВремя: ${event.EVENT_TIME}\nМесто: ${event.LOCATION}\nОписание: ${event.DESCRIPTION}`;
+
+        for (const user of users) {
+            await sendNotificationEvent(user.TELEGRAM_ID, message);
+        }
+    }
+	} catch (error) {
+		console.log('Ошибка при обработке списка мероприятий для рассылки');
+	}
+};
+
+// cron-расписание для каждого мероприятия (7, 3, 2, 1 день до их начала)
+cron.schedule('0 9 * * *', () => { // Выполняется каждый день в 0 минут, 9 часов.
+	checkAndSendNotificationsEvents(7);
+    checkAndSendNotificationsEvents(3);
+    checkAndSendNotificationsEvents(2);
+    checkAndSendNotificationsEvents(1);
+});
