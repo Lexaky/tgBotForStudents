@@ -391,7 +391,7 @@ bot.on('message', (msg) => {
 	}
 });
 
-// Функция для создания уведомлений для всех пользователей от админов
+// Функция для создания уведомлений для всех пользователей от админов (- частично)
 const handleNotification = async (chatId) => {
 	const usr = Users.findOne({where: {TELEGRAM_ID: chatId}});
 	if (!usr) {
@@ -419,7 +419,7 @@ const handleNotification = async (chatId) => {
 	return;
 }
 
-// Функция для вывода существующих мероприятий и создания мероприятий админами
+// Функция для вывода существующих мероприятий и создания мероприятий админами (?+)
 const handleEvent = async (chatId) => {
     try {
         // Найти пользователя по TELEGRAM_ID
@@ -455,7 +455,7 @@ const handleEvent = async (chatId) => {
     }
 };
 
-// Функция для обработки создания группы
+// Функция для обработки создания группы +
 const handleCreateGroup = async (chatId) => {
     // Запрос названия группы
     bot.sendMessage(chatId, 'Введите название группы, которую хотите создать:', {
@@ -518,7 +518,7 @@ const handleCreateGroup = async (chatId) => {
     });
 };
 
-// Функция для обработки заявок на создание групп
+// Функция для обработки заявок на создание групп +
 const handleGroupRequests = async (chatId) => {
     try {
 		const telegramId = chatId;
@@ -576,7 +576,7 @@ bot.on('callback_query', async (callbackQuery) => {
     const chatId = callbackQuery.message.chat.id;
     const action = callbackQuery.data;
 	console.log(action);
-    if (action.startsWith('group_')) {
+    if (action.startsWith('group_')) { // +
         const groupId = parseInt(action.replace('group_', ''));
 
             // Найти группу и включить ассоциированные данные
@@ -605,11 +605,11 @@ bot.on('callback_query', async (callbackQuery) => {
             }
 
     } 
-	else if (action === 'back_to_requests') {
+	else if (action === 'back_to_requests') { // +
         // Вызов функции для отображения списка заявок на создание групп
         await handleGroupRequests(chatId);
     } 
-	else if (action.startsWith('accept_group_')) {
+	else if (action.startsWith('accept_group_')) { // +
         const groupId = parseInt(action.replace('accept_group_', ''));
 
         try {
@@ -649,7 +649,7 @@ bot.on('callback_query', async (callbackQuery) => {
             bot.sendMessage(chatId, 'Произошла ошибка при принятии группы.');
         }
     } 
-	else if (action.startsWith('reject_group_')) {
+	else if (action.startsWith('reject_group_')) { // +
         const groupId = parseInt(action.replace('reject_group_', ''));
         try {
             // Удалить заявку на создание группы
@@ -660,7 +660,7 @@ bot.on('callback_query', async (callbackQuery) => {
             bot.sendMessage(chatId, 'Произошла ошибка при отклонении группы.');
         }
     } 
-	else if (action.startsWith('approved_group_')) { 
+	else if (action.startsWith('approved_group_')) { // +
 		//Была выбрана конкретная учебная группа для подачи заявки
 		 const groupId = parseInt(action.replace('approved_group_', ''));
 		 const group = await GroupStud.findOne({where: {GROUP_ID: groupId}});
@@ -687,11 +687,11 @@ bot.on('callback_query', async (callbackQuery) => {
 			 return;
 		 }
 	} 
-	else if (action === 'back_main') {
+	else if (action === 'back_main') { // +
 		showMainMenu(chatId);
 		return;
 	} 
-	else if (action.startsWith('enter_group_')) {
+	else if (action.startsWith('enter_group_')) { // +
 		try {
         const groupId = parseInt(action.replace('enter_group_', ''));
         const findDbId = await Users.findOne({ where: { TELEGRAM_ID: chatId } });
@@ -731,7 +731,7 @@ bot.on('callback_query', async (callbackQuery) => {
         showMainMenu(chatId);
     }
 	}
-	else if (action.startsWith('get_info_')) {
+	else if (action.startsWith('get_info_')) { // +
 		try {
 			const checkRights = await Users.findOne({where: {TELEGRAM_ID: chatId}});
 			if (!checkRights)
@@ -772,7 +772,7 @@ bot.on('callback_query', async (callbackQuery) => {
 			bot.sendMessage(chatId, 'Ошибка при просмотре участников группы');
 		}
 	} 
-	else if (action.startsWith('change_role_')) {
+	else if (action.startsWith('change_role_')) { // +
 		const act = action.replace('change_role_', '');
 		console.log('act: ' + act);
 		const userId = parseInt(act.split('_')[0]);
@@ -805,7 +805,7 @@ bot.on('callback_query', async (callbackQuery) => {
 			
 		}
 	}
-	else if (action.startsWith('make_')) {
+	else if (action.startsWith('make_')) { // +
 		
 		if (action.startsWith('make_admin_')) {
 			let act = action.replace('make_admin_', '');
@@ -853,7 +853,7 @@ bot.on('callback_query', async (callbackQuery) => {
 			showMainMenu(chatId);
 		}
 	}
-	else if (action === 'show_all_events') {
+	else if (action === 'show_all_events') { // ? Частично, нужно добавить кнопки удаления мероприятий
         try {
             const currentDate = new Date().toISOString().split('T')[0]; // Получаем текущую дату в формате YYYY-MM-DD
 
@@ -882,7 +882,7 @@ bot.on('callback_query', async (callbackQuery) => {
 			return;
         }
     } 
-	else if (action === 'create_event') {
+	else if (action === 'create_event') { // +
         bot.sendMessage(chatId, 'Напишите в чате следующее:\n[Название мероприятия]\n[Дата проведения мероприятия]\n[Время проведения мероприятия]\n[Место проведения мероприятия]\n[Описание мероприятия]');
 		bot.sendMessage(chatId, "Пример:\nСбор разработчиков приложений\n2024-12-31\n18:00:00\nГлавный зал\nСбор разработчиков для подведения итогов");
 		bot.sendMessage(chatId, "Введите 'Назад' для возврата в главное меню");
@@ -940,10 +940,6 @@ bot.on('callback_query', async (callbackQuery) => {
         });
 		return;
     } 
-	else if (action === 'back_main') {
-        showMainMenu(chatId);
-		return;
-    }
 	else if (action.startsWith('show_group_menu_')) { // +
 		const grId = parseInt(action.replace('show_group_menu_', ''));
 		showGroupInfo(chatId, grId);
@@ -1035,15 +1031,85 @@ bot.on('callback_query', async (callbackQuery) => {
 	}
 	else if (action.startsWith('requests_join_')) { // - ez
 		const grId = parseInt(action.replace('requests_join_', '')); //group id
-		
+		const requestsToGroup = await GroupRequests.findAll({where: {GROUP_ID: groupId, IS_APPROVED: false}});
+		if (requestsToGroup.length === 0)
+		{
+			bot.sendMessage(chatId, 'Заявок на вступление в группу нет');
+		} else {
+			const keyboard = [];
+			for (const rtg of requestsToGroup) {
+				const usr = await Users.findOne({ where: { GROUP_ID: rtg.REQUESTER_ID } });
+				if (usr) {
+					keyboard.push([{ text: usr.USER_NAME, callback_data: `show_user_request_${usr.REQUESTER_ID}_${grId}` }]);
+				}
+			}
+			keyboard.push([{ text: 'Назад', callback_data: 'back_main' }]);
+			
+			//Вывод заявок на вступление в группу в виде кнопок:
+			bot.sendMessage(chatId, 'Список заявок на вступление в группу:', {
+				reply_markup: {
+					inline_keyboard: keyboard
+				}
+			});
+			
+		}
+		showGroupInfo(chatId, grId);
+		return;
 	}
 	else if (action.startsWith('send_notification_')) { // - ez
 		const grId = parseInt(action.replace('send_notification_', '')); //group id
 		
+	} 
+	else if (action === 'alarm_all') { // +
+		bot.sendMessage(chatId, 'Напишите сообщение для каждого пользователя ("Назад", чтобы вернуться в главное меню): ');
+		bot.once('message', (msg) => {
+			if (msg.text === 'Назад' || msg.text === 'назад') {
+				showMainMenu(chatId);
+				return;
+			} else {
+				const allUsers = Users.findAll();
+				for (usr of allUsers)
+				{
+					bot.sendMessage(usr.TELEGRAM_ID, msg.text);
+				}
+				bot.sendMessage(chatId, 'Все пользователи получили ваш текст');
+			}
+			handleNotification(chatId);
+		});
+	}
+	else if (action === 'alarm_group') { // -
+		
+	}
+	else if (action === 'alarm_user') { // -
+		
+	}
+	else if (action.startsWith('show_user_request_')) { // Для вывода кнопок пользователя-заявителя в группу (-)
+		const words = action.replace('show_user_request_', '');
+		const reqId = parseInt(words.split('_')[0]);
+		const grId = parseInt(words.split('_')[1]);
+		try { // Сейчас здесь просто true (принятие) пользователя в группу
+			const usr = await GroupRequests.findOne({where: {REQUESTER_ID: reqId, GROUP_ID: grId, IS_APPROVED: false}});
+			if (!usr) {
+				bot.sendMessage(chatId, 'Пользователь не найден');
+			} else {
+				//Update + Create
+				await GroupRequests.update({IS_APPROVED: true}, {where: {REQUESTER_ID: reqId, GROUP_ID: grId, IS_APPROVED: false}});
+				await UserGroups.create({
+					USER_ID: reqId,
+					GROUP_ID: grId,
+					ROLE: 'student'
+				});
+			}
+		} catch (error) {
+			console.log('Ошибка при просмотре профиля пользователя, подавшего заявку');
+			bot.sendMessage(chatId, 'Ошибка при просмотре профиля пользователя, подавшего заявку');
+		}
+		showGroupInfo(chatId, grId);
+		return;
 	}
 });
 
-// Функция для обработки информации о моих группах
+// Функция для обработки информации о моих группах +
 const handleMyGroupsInfo = async (chatId) => {
     const telegramId = chatId;
     const user = await Users.findOne({ where: { TELEGRAM_ID: telegramId } });
@@ -1079,7 +1145,7 @@ const handleMyGroupsInfo = async (chatId) => {
     }
 };
 
-// Функция для обработки заявки на вступление в группу
+// Функция для обработки заявки на вступление в группу +
 const handleJoinGroup = async (chatId) => {
     try {
         // Получаем список подтверждённых групп
@@ -1113,7 +1179,7 @@ const handleJoinGroup = async (chatId) => {
     }
 };
 
-// Функция для отправки уведомления о мероприятии
+// Функция для отправки уведомления о мероприятии +
 const sendNotificationEvent = async (userId, message) => {
     try {
         await bot.sendMessage(userId, message);
@@ -1122,7 +1188,7 @@ const sendNotificationEvent = async (userId, message) => {
     }
 };
 
-// Функция для проверки и отправки уведомлений о мероприятиях
+// Функция для проверки и отправки уведомлений о мероприятиях +
 const checkAndSendNotificationsEvents = async (daysBefore) => {
     try {
 	const targetDate = new Date();
@@ -1156,7 +1222,7 @@ const checkAndSendNotificationsEvents = async (daysBefore) => {
 	}
 };
 
-// cron-расписание для каждого мероприятия (7, 3, 2, 1 день до их начала)
+// cron-расписание для каждого мероприятия (7, 3, 2, 1 день до их начала) +
 cron.schedule('0 9 * * *', () => { // Выполняется каждый день в 0 минут, 9 часов.
 	checkAndSendNotificationsEvents(7);
     checkAndSendNotificationsEvents(3);
