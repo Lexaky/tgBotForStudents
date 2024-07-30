@@ -1,331 +1,37 @@
 const TelegramBot = require('node-telegram-bot-api');
 const cron = require('node-cron');
+const { sequelize, GroupStud, Users, Subjects, UserGroups, Tasks, Schedule, Events, Notifications, GroupRequests, UserStates } = require('./models');
 const { Sequelize, DataTypes, QueryTypes, Op } = require('sequelize');
-const sequelize = new Sequelize('tg', 'root', '12345', {
-    host: 'localhost',
-    dialect: 'mysql',
-});
-// Модель GroupStud
-const GroupStud = sequelize.define('Group_Stud', {
-    GROUP_ID: {
-        type: DataTypes.INTEGER,
-        autoIncrement: true,
-        primaryKey: true
-    },
-    GROUP_NAME: {
-        type: DataTypes.STRING(255),
-        allowNull: false,
-		unique: true
-    },
-    IS_APPROVED: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false
-    },
-    CREATED_AT: {
-        type: DataTypes.DATE,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
-    },
-    CREATOR_ID: {
-        type: DataTypes.INTEGER
-    }
-}, {
-    tableName: 'GROUP_STUD',
-    timestamps: false
-});
-
-// Модель Users
-const Users = sequelize.define('Users', {
-    USER_ID: {
-        type: DataTypes.INTEGER,
-        autoIncrement: true,
-        primaryKey: true
-    },
-    USERNAME: {
-        type: DataTypes.STRING(255),
-        allowNull: false
-    },
-    TELEGRAM_ID: {
-        type: DataTypes.BIGINT,
-        allowNull: false,
-        unique: true
-    },
-    ROLE_GLOBAL: {
-        type: DataTypes.ENUM('user', 'admin'),
-        allowNull: false,
-        defaultValue: 'user'
-    },
-    CREATED_AT: {
-        type: DataTypes.DATE,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
-    }
-}, {
-    tableName: 'USERS',
-    timestamps: false
-});
-
-// Определение ассоциаций
-GroupStud.belongsTo(Users, { foreignKey: 'CREATOR_ID', as: 'Creator' });
-Users.hasMany(GroupStud, { foreignKey: 'CREATOR_ID', as: 'Groups' });
-// Модель Subjects
-const Subjects = sequelize.define('Subjects', {
-    SUBJECT_ID: {
-        type: DataTypes.INTEGER,
-        autoIncrement: true,
-        primaryKey: true
-    },
-    SUBJECT_NAME: {
-        type: DataTypes.STRING(255),
-        allowNull: false
-    },
-	GROUP_ID: {
-		type: DataTypes.INTEGER,
-		allowNull: false
-	},
-	IS_APPROVED: {
-		type: DataTypes.BOOLEAN,
-		defaultValue: false
-	},
-	CREATOR_TELEGRAM_ID: {
-		type: DataTypes.INTEGER,
-		allowNull: false
-	}
-}, {
-    tableName: 'SUBJECTS',
-    timestamps: false
-});
-
-// Модель UserGroups
-const UserGroups = sequelize.define('UserGroups', {
-    USER_ID: {
-        type: DataTypes.INTEGER,
-        primaryKey: true
-    },
-    GROUP_ID: {
-        type: DataTypes.INTEGER,
-        primaryKey: true
-    },
-    ROLE: {
-        type: DataTypes.ENUM('student', 'curator', 'admin'),
-        allowNull: false,
-        defaultValue: 'student'
-    }
-}, {
-    tableName: 'USER_GROUPS',
-    timestamps: false
-});
-
-UserGroups.belongsTo(Users, { foreignKey: 'USER_ID' });
-UserGroups.belongsTo(GroupStud, { foreignKey: 'GROUP_ID' });
-
-// Модель Tasks
-const Tasks = sequelize.define('Tasks', {
-    TASK_ID: {
-        type: DataTypes.INTEGER,
-        autoIncrement: true,
-        primaryKey: true
-    },
-    USER_ID: {
-        type: DataTypes.INTEGER
-    },
-    GROUP_ID: {
-        type: DataTypes.INTEGER,
-		allowNull: true,
-        defaultValue: null
-    },
-    SUBJECT_ID: {
-        type: DataTypes.INTEGER,
-		allowNull: true,
-		defaultValue: null
-    },
-    TITLE: {
-        type: DataTypes.STRING(255),
-		allowNull: false
-    },
-    DESCRIPTION: {
-        type: DataTypes.TEXT,
-		allowNull: false
-    },
-    DEADLINE: {
-        type: DataTypes.DATE,
-		allowNull: true
-    },
-    IS_COMPLETED: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false
-    },
-    CREATED_AT: {
-        type: DataTypes.DATE,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
-    },
-	FOR_ALL: {
-		type: DataTypes.BOOLEAN,
-		defaultValue: false
-	}
-}, {
-    tableName: 'TASKS',
-    timestamps: false
-});
-
-Tasks.belongsTo(Users, { foreignKey: 'USER_ID' });
-Tasks.belongsTo(GroupStud, { foreignKey: 'GROUP_ID' });
-Tasks.belongsTo(Subjects, { foreignKey: 'SUBJECT_ID' });
-
-// Модель Schedule
-const Schedule = sequelize.define('Schedule', {
-    GROUP_ID: {
-        type: DataTypes.INTEGER,
-        primaryKey: true
-    },
-    SUBJECT_ID: {
-        type: DataTypes.INTEGER,
-        primaryKey: true
-    },
-    LESSON_DATE: {
-        type: DataTypes.DATE,
-        primaryKey: true
-    },
-    LESSON_TIME: {
-        type: DataTypes.TIME,
-        primaryKey: true
-    }
-}, {
-    tableName: 'SCHEDULE',
-    timestamps: false
-});
-
-Schedule.belongsTo(GroupStud, { foreignKey: 'GROUP_ID' });
-Schedule.belongsTo(Subjects, { foreignKey: 'SUBJECT_ID' });
-
-// Модель Events
-const Events = sequelize.define('Events', {
-    EVENT_ID: {
-        type: DataTypes.INTEGER,
-        autoIncrement: true,
-        primaryKey: true
-    },
-    EVENT_NAME: {
-        type: DataTypes.STRING(255),
-        allowNull: false
-    },
-    EVENT_DATE: {
-        type: DataTypes.DATE
-    },
-    EVENT_TIME: {
-        type: DataTypes.TIME
-    },
-    LOCATION: {
-        type: DataTypes.STRING(255)
-    },
-    DESCRIPTION: {
-        type: DataTypes.TEXT
-    }
-}, {
-    tableName: 'EVENTS',
-    timestamps: false
-});
-
-// Модель Notifications
-const Notifications = sequelize.define('Notifications', {
-    NOTIFICATION_ID: {
-        type: DataTypes.INTEGER,
-        autoIncrement: true,
-        primaryKey: true
-    },
-    USER_ID: {
-        type: DataTypes.INTEGER,
-		allowNull: true
-    },
-    TASK_ID: {
-        type: DataTypes.INTEGER,
-		allowNull: true
-    },
-    EVENT_ID: {
-        type: DataTypes.INTEGER,
-		allowNull: true
-    },
-    NOTIFICATION_DATE: {
-        type: DataTypes.DATE
-    },
-    NOTIFICATION_TIME: {
-        type: DataTypes.TIME
-    },
-    MESSAGE: {
-        type: DataTypes.TEXT
-    },
-    IS_SENT: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false
-    },
-    CREATED_AT: {
-        type: DataTypes.DATE,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
-    }
-}, {
-    tableName: 'NOTIFICATIONS',
-    timestamps: false
-});
-
-Notifications.belongsTo(Users, { foreignKey: 'USER_ID' });
-Notifications.belongsTo(Tasks, { foreignKey: 'TASK_ID' });
-Notifications.belongsTo(Events, { foreignKey: 'EVENT_ID' });
-
-// Модель GroupRequests
-const GroupRequests = sequelize.define('GroupRequests', {
-    REQUEST_ID: {
-        type: DataTypes.INTEGER,
-        autoIncrement: true,
-        primaryKey: true
-    },
-    REQUESTER_ID: {
-        type: DataTypes.INTEGER
-    },
-    GROUP_NAME: {
-        type: DataTypes.STRING(255),
-        allowNull: false
-    },
-    REQUEST_DATE: {
-        type: DataTypes.DATE,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
-    },
-    IS_APPROVED: {
-        type: DataTypes.BOOLEAN,
-        defaultValue: false
-    }
-}, {
-    tableName: 'GROUP_REQUESTS',
-    timestamps: false
-});
-
-GroupRequests.belongsTo(Users, { foreignKey: 'REQUESTER_ID' });
-
-sequelize.sync({force: true}).then(result=>{
-  console.log(result);
-})
-.catch(err=> console.log(err));
-
 // Инициализация бота
 const token = '7345012579:AAEpRCqweK2FLpRMfILGIf4Y9geDkpGdlHw';
 const bot = new TelegramBot(token, { polling: true });
 
-//Все нижеперечисленные действия осуществляются для функции handleMyGroupsInfo()
-//В меню группы должны быть кнопки "Расписание занятий", "Актуальные задачи", "Создать учебный предмет" (только куратор),
-//"Добавить задачу", "Добавить предмет в расписание", "Заявки на задачи" (только куратор), "Заявки на вступление в группу" (только куратор),
-//"Список учебных предметов" с последующими кнопками удаления существующих предметов (только куратор), "Уведомения для группы" (только куратор).
-//При нажатии на кнопку "Актуальные задачи" выводится список задач в виде кнопок, при нажатии на них выводится фулл описание задачи и
-//кнопка "предложить группе", которая отправляет куратору запрос на вывод задачи группе, а не только пользователю + кнопка "Назад"
+// Функция для установки состояния пользователя
+const setState = async (telegramId, state) => {
+    const userState = await UserStates.findOne({ where: { TELEGRAM_ID: telegramId } });
+    if (userState) {
+        await UserStates.update({ STATE: state }, { where: { TELEGRAM_ID: telegramId } });
+    } else {
+        await UserStates.create({ TELEGRAM_ID: telegramId, STATE: state });
+    }
+};
 
-
+// Функция для получения состояния пользователя
+const getState = async (telegramId) => {
+    const userState = await UserStates.findOne({ where: { TELEGRAM_ID: telegramId } });
+    return userState ? userState.STATE : null;
+};
 
 // Функция для отображения главного меню
-// *Доработать действия при нажатии на "Уведомления".
 const showMainMenu = (chatId) => {
     bot.sendMessage(chatId, 'Главное меню', {
         reply_markup: {
-            keyboard: [
-                [{ text: 'Создать группу' }],
-                [{ text: 'Заявки на создание групп' }, { text: 'Информация о моих группах' }],
-                [{ text: 'Вступить в группу' }],
-                [{ text: 'Уведомления' }, { text: 'Мероприятия' }]
+            inline_keyboard: [
+                [{ text: 'Создать группу', callback_data: `create_group` }],
+                [{ text: 'Заявки на создание групп', callback_data: `requests_on_create_group` }, 
+				{ text: 'Информация о моих группах', callback_data: `info_my_groups` }],
+                [{ text: 'Вступить в группу', callback_data: `join_to_group` }],
+                [{ text: 'Уведомления', callback_data: `notif` }, { text: 'Мероприятия', callback_data: `events` }]
             ]
         }
     });
@@ -333,8 +39,9 @@ const showMainMenu = (chatId) => {
 
 const showGroupInfo = async (chatId, groupId) => {
 	console.log('Открытие меню для группы с id: ' + groupId);
+	try {
 	const grName = await GroupStud.findOne({where: {GROUP_ID: groupId}});
-    bot.sendMessage(chatId, 'Главное меню группы ' + grName.GROUP_NAME, {
+	bot.sendMessage(chatId, 'Главное меню группы ' + grName.GROUP_NAME, {
         reply_markup: {
             inline_keyboard: [
                 [{ text: 'Расписание занятий', callback_data: `show_schedule_${groupId}` }, { text: 'Главное меню', callback_data: `back_main` }],
@@ -345,6 +52,10 @@ const showGroupInfo = async (chatId, groupId) => {
             ]
         }
     });
+	} catch (error) {
+		console.log('Ошибка при открытии меню группы');
+		bot.sendMessage(chatId, 'Ошибка при открытии меню группы');
+	}
 };
 
 // Обработка команды /start
@@ -376,24 +87,12 @@ bot.on('message', (msg) => {
     const chatId = msg.chat.id;
     const text = msg.text;
 
-    if (text === 'Создать группу') {
-        handleCreateGroup(chatId);
-    } else if (text === 'Заявки на создание групп') {
-        handleGroupRequests(chatId);
-    } else if (text === 'Информация о моих группах') {
-        handleMyGroupsInfo(chatId);
-    } else if (text === 'Вступить в группу') {
-        handleJoinGroup(chatId);
-    } else if (text === 'Уведомления') {
-		handleNotification(chatId);
-	} else if (text == 'Мероприятия') {
-		handleEvent(chatId);
-	}
+    
 });
 
 // Функция для создания уведомлений для всех пользователей от админов (- частично)
 const handleNotification = async (chatId) => {
-	const usr = Users.findOne({where: {TELEGRAM_ID: chatId}});
+	const usr = await Users.findOne({where: {TELEGRAM_ID: chatId}});
 	if (!usr) {
 		bot.sendMessage(chatId, 'Пользователь не существует!');
 	} else {
@@ -432,7 +131,14 @@ const handleEvent = async (chatId) => {
 
         // Проверка на права пользователя
         if (user.ROLE_GLOBAL === 'user') {
-            bot.sendMessage(chatId, 'У вас недостаточно прав для доступа к мероприятиям.');
+            bot.sendMessage(chatId, 'Выберите действие:', {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'Показать все мероприятия', callback_data: 'show_all_events' }],
+                        [{ text: 'Назад', callback_data: 'back_main' }]
+                    ]
+                }
+            });
             return;
         }
 
@@ -468,7 +174,7 @@ const handleCreateGroup = async (chatId) => {
     });
 
     // Обработка сообщения
-    bot.once('message', async (msg) => {
+    bot.on('message', async (msg) => {
         const groupName = msg.text;
         const telegramId = msg.from.id;
 		
@@ -571,6 +277,8 @@ const handleGroupRequests = async (chatId) => {
     }
 };
 
+
+
 // Обработка нажатий на кнопки
 bot.on('callback_query', async (callbackQuery) => {
     const chatId = callbackQuery.message.chat.id;
@@ -604,7 +312,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 bot.sendMessage(chatId, 'Группа не найдена.');
             }
 
-    } 
+    }
 	else if (action === 'back_to_requests') { // +
         // Вызов функции для отображения списка заявок на создание групп
         await handleGroupRequests(chatId);
@@ -732,46 +440,53 @@ bot.on('callback_query', async (callbackQuery) => {
     }
 	}
 	else if (action.startsWith('get_info_')) { // +
-		try {
-			const checkRights = await Users.findOne({where: {TELEGRAM_ID: chatId}});
-			if (!checkRights)
-			{
-				bot.sendMessage(chatId, 'Зарегистрируйтесь перед просмотром участников (/start)');
-			} else {
-				if (checkRights.ROLE_GLOBAL === 'admin') {
-					const groupId = parseInt(action.replace('get_info_', ''));
-					const getList = await UserGroups.findAll({where: {GROUP_ID: groupId}});
-					
-					if(!getList)
-					{
-						bot.sendMessage(chatId, 'Участники данной группы не найдены');
-						showMainMenu(chatId);
-					} else {
-						
-						const keyboard = getList.map(request => [
-    { text: `${request.USER_ID} - ${request.ROLE}`, callback_data: `change_role_${request.USER_ID}_${request.GROUP_ID}` }
-]);
-			
-						keyboard.push([{ text: 'Назад', callback_data: 'back_main' }]);
-						// Отправляем кнопки
-						bot.sendMessage(chatId, 'Выберите участника:', {
-							reply_markup: {
-								inline_keyboard: keyboard
-							}
-						});
-						
-					}
-					
-				} else {
-					bot.sendMessage(chatId, 'У вас недостаточно прав для просмотра списка участников!');
-					showMainMenu(chatId);
-				}
-			}
-		} catch (error) {
-			console.log('Ошибка при просмотре участников группы');
-			bot.sendMessage(chatId, 'Ошибка при просмотре участников группы');
-		}
-	} 
+    try {
+        const checkRights = await Users.findOne({ where: { TELEGRAM_ID: chatId } });
+        if (!checkRights) {
+            bot.sendMessage(chatId, 'Зарегистрируйтесь перед просмотром участников (/start)');
+        } else {
+            if (checkRights.ROLE_GLOBAL === 'admin') {
+                const groupId = parseInt(action.replace('get_info_', ''));
+                const getList = await UserGroups.findAll({ where: { GROUP_ID: groupId } });
+
+                if (!getList.length) {
+                    bot.sendMessage(chatId, 'Участники данной группы не найдены');
+                    showMainMenu(chatId);
+                } else {
+                    const userPromises = getList.map(async request => {
+                        const user = await Users.findOne({ where: { USER_ID: request.USER_ID } });
+                        return {
+                            USERNAME: user.USERNAME,
+                            ROLE: request.ROLE,
+                            USER_ID: request.USER_ID,
+                            GROUP_ID: request.GROUP_ID
+                        };
+                    });
+
+                    const users = await Promise.all(userPromises);
+
+                    const keyboard = users.map(user => [
+                        { text: `${user.USERNAME} - ${user.ROLE}`, callback_data: `change_role_${user.USER_ID}_${user.GROUP_ID}` }
+                    ]);
+
+                    keyboard.push([{ text: 'Назад', callback_data: 'back_main' }]);
+                    // Отправляем кнопки
+                    bot.sendMessage(chatId, 'Выберите участника:', {
+                        reply_markup: {
+                            inline_keyboard: keyboard
+                        }
+                    });
+                }
+            } else {
+                bot.sendMessage(chatId, 'У вас недостаточно прав для просмотра списка участников!');
+                showMainMenu(chatId);
+            }
+        }
+    } catch (error) {
+        console.log('Ошибка при просмотре участников группы: ' + error);
+        bot.sendMessage(chatId, 'Ошибка при просмотре участников группы');
+    }
+}
 	else if (action.startsWith('change_role_')) { // +
 		const act = action.replace('change_role_', '');
 		console.log('act: ' + act);
@@ -853,40 +568,53 @@ bot.on('callback_query', async (callbackQuery) => {
 			showMainMenu(chatId);
 		}
 	}
-	else if (action === 'show_all_events') { // ? Частично, нужно добавить кнопки удаления мероприятий
-        try {
-            const currentDate = new Date().toISOString().split('T')[0]; // Получаем текущую дату в формате YYYY-MM-DD
+	else if (action === 'show_all_events') { // ??
+    try {
+        const currentDate = new Date().toISOString().split('T')[0]; // Получаем текущую дату в формате YYYY-MM-DD
 
-			const events = await sequelize.query(
-			'SELECT * FROM EVENTS WHERE EVENT_DATE >= :currentDate',
-			{
-				replacements: { currentDate },
-				type: QueryTypes.SELECT
-			});
-
-            if (events.length === 0) {
-                bot.sendMessage(chatId, 'Нет предстоящих мероприятий.');
-            } else {
-                const eventMessages = events.map(event => {
-                    return `Название: ${event.EVENT_NAME}\nДата: ${event.EVENT_DATE}\nВремя: ${event.EVENT_TIME}\nМесто: ${event.LOCATION}\nОписание: ${event.DESCRIPTION}`;
-                }).join('\n\n');
-
-                bot.sendMessage(chatId, `Предстоящие мероприятия:\n\n${eventMessages}`);
+        const events = await sequelize.query(
+            'SELECT * FROM EVENTS WHERE EVENT_DATE >= :currentDate',
+            {
+                replacements: { currentDate },
+                type: QueryTypes.SELECT
             }
-			showMainMenu(chatId);
-			return;
-        } catch (error) {
-            console.error('Ошибка при получении мероприятий:', error);
-            bot.sendMessage(chatId, 'Произошла ошибка при получении мероприятий.');
-			showMainMenu(chatId);
-			return;
+        );
+
+        if (events.length === 0) {
+            bot.sendMessage(chatId, 'Нет предстоящих мероприятий.');
+        } else {
+            const eventMessages = events.map(event => {
+                return {
+                    text: `Название: ${event.EVENT_NAME}\nДата: ${event.EVENT_DATE}\nВремя: ${event.EVENT_TIME}\nМесто: ${event.LOCATION}\nОписание: ${event.DESCRIPTION}`,
+                    callback_data: `delete_event_${event.EVENT_ID}`
+                };
+            });
+
+            const inlineKeyboard = eventMessages.map(event => [
+                { text: event.text, callback_data: event.callback_data },
+                { text: 'Удалить', callback_data: `delete_event_${event.callback_data.split('_')[2]}` }
+            ]);
+
+            bot.sendMessage(chatId, 'Предстоящие мероприятия:', {
+                reply_markup: {
+                    inline_keyboard: inlineKeyboard
+                }
+            });
         }
-    } 
+        showMainMenu(chatId);
+        return;
+    } catch (error) {
+        console.error('Ошибка при получении мероприятий:', error);
+        bot.sendMessage(chatId, 'Произошла ошибка при получении мероприятий.');
+        showMainMenu(chatId);
+        return;
+    }
+}
 	else if (action === 'create_event') { // +
         bot.sendMessage(chatId, 'Напишите в чате следующее:\n[Название мероприятия]\n[Дата проведения мероприятия]\n[Время проведения мероприятия]\n[Место проведения мероприятия]\n[Описание мероприятия]');
 		bot.sendMessage(chatId, "Пример:\nСбор разработчиков приложений\n2024-12-31\n18:00:00\nГлавный зал\nСбор разработчиков для подведения итогов");
 		bot.sendMessage(chatId, "Введите 'Назад' для возврата в главное меню");
-        bot.once('message', async (msg) => {
+        bot.on('message', async (msg) => {
 			if (msg.text === 'Назад' || msg.text === 'назад')
 			{
 				showMainMenu(chatId);
@@ -944,67 +672,233 @@ bot.on('callback_query', async (callbackQuery) => {
 		const grId = parseInt(action.replace('show_group_menu_', ''));
 		showGroupInfo(chatId, grId);
 	} 
-	else if (action.startsWith('show_schedule_')) { // -
-		const grId = parseInt(action.replace('show_schedule', '')); //group id
-		
-	}
-	else if (action.startsWith('actual_tasks_')) { // -
-		const grId = parseInt(action.replace('actual_tasks_', '')); //group id
-		const tasks = Tasks.findAll({where: {IS_COMPLETED: false}});
-		
-	}
-	else if (action.startsWith('add_task_')) { // ?? -
-		const grId = parseInt(action.replace('add_task_', '')); //group id
-		bot.sendMessage(chatId, 'Введите информацию о вашей задаче, согласно шаблону:');
-		bot.sendMessage(chatId, '[Заголовок задачи]\n[Описание задачи]\n[Дата дедлайна YYYY-MM-DD]');
-		bot.sendMessage(chatId, 'Пример:\nЗакончить проект по математике\nЗакончить проект, связанный с докладом по математике\n2024-12-31');
-		bot.sendMessage(chatId, 'Введите "Назад", чтобы вернуться обратно');
-		bot.once('message', async (msg) => {
-			if (msg.text === 'Назад' || msg.text === 'назад')
-			{
-				showGroupInfo(chatId, grId);
-				return;
+	else if (action.startsWith('show_schedule_')) { // ? ** Расписание в виде картинки нужно добавить
+		const today = new Date();
+
+		// Преобразуем group ID из action
+		const grId = parseInt(action.replace('show_schedule_', ''));
+		console.log(grId);
+		try {
+		// Выполняем запрос
+		const findAllSubjectsInSchedule = await Schedule.findAll({
+		  where: {
+			GROUP_ID: grId,
+			LESSON_DATE: {
+			  [Op.gte]: today // Фильтруем по дате, оставляем только те записи, где LESSON_DATE >= сегодняшней даты
 			}
-            const eventDetails = msg.text.split('\n');
-			
-			if (eventDetails.length !== 3) {
-                bot.sendMessage(chatId, 'Неправильный формат данных. Попробуйте снова.');
-                showGroupInfo(chatId, grId);
-                return;
-            } else {
-				try {
-					const usr = Users.findOne({where: {TELEGRAM_ID: chatId}});
-					if (!usr) {
-						bot.sendMessage(chatId, 'Пользователь не найден');
-					}
-					const userId = parseInt(usr.USER_ID);
-					// Проверка формата даты
-					if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDetails[2])) {
-						bot.sendMessage(chatId, 'Неправильный формат даты. Попробуйте снова.\nПример:\nЗакончить проект по математике\nЗакончить проект, связанный с докладом по математике\n2024-12-31');
-					} else {
-						await Tasks.create ({
-							USER_ID: userId,
-							TITLE: eventDetails[0],
-							DESCRIPTION: eventDetails[1],
-							DEADLINE: eventDetails[2]
-						});
-						console.log('Успешна задана задача с заголовком "' + eventDetails[0] + '", и содержанием "' + eventDetails[1] + '"');
-						bot.sendMessage(chatId, 'Успешна задана задача с заголовком "' + eventDetails[0] + '", и содержанием "' + eventDetails[1] + '"');
-					}
-				} catch (error) {
-					console.log('Ошибка при задании Task в таблицу Tasks');
-					bot.sendMessage(chatId, 'Ошибка при создании задачи!');
-				}
-				showGroupInfo(chatId, grId);
-				return;
-			}
+		  },
+		  order: [
+			['LESSON_DATE', 'ASC'], // Сортируем по возрастанию LESSON_DATE
+			['LESSON_TIME', 'ASC']  // Сортируем по возрастанию LESSON_TIME
+		  ]
 		});
-		
+		if (findAllSubjectsInSchedule.length === 0) 
+		{
+			bot.sendMessage(chatId, 'Ваше расписание ещё не составлено');
+		} else {
+			let finalText = 'Расписание занятий:\n';
+			for (sub of findAllSubjectsInSchedule) {
+				const subjectNameFinder = await Subjects.findOne({where: {SUBJECT_ID: sub.SUBJECT_ID}});
+				finalText += sub.LESSON_DATE + ' - [' + sub.LESSON_TIME + ']: ' + subjectNameFinder.SUBJECT_ID + '\n';
+			}
+			//Здесь FinalText мог бы быть в виде картинки
+			bot.sendMessage(chatId, finalText);
+		}
+		} catch (error) {
+			console.log('Ошибка при поиске расписания группы');
+			bot.sendMessage(chatId, 'Ошибка при поиске расписания группы');
+		}
+		showGroupInfo(chatId, grId);
+		return;
 	}
+	else if (action.startsWith('actual_tasks_')) { // +
+		const grId = parseInt(action.replace('actual_tasks_', '')); //group id
+		const userId = await Users.findOne({where: {TELEGRAM_ID: chatId}});
+		if (!userId) {
+			bot.sendMessage(chatId, 'Пользователь не найден!');
+		}
+		else {
+			bot.sendMessage(chatId, 'Вывод вашего списка задач\n\n\nВывод вашего списка задач');
+			let tasks = await Tasks.findAll({where: {IS_COMPLETED: false, USER_ID: userId.USER_ID, GROUP_ID: grId, FOR_ALL: false}, order: [['DEADLINE', 'ASC']]});
+			for (tsk of tasks) {
+				bot.sendMessage(chatId, 'Задача "' + tsk.TITLE + '"\n  ' + tsk.DESCRIPTION + '\n', {
+					reply_markup: {
+						inline_keyboard: [
+							[{text: 'Задача выполнена', callback_data: `complete_task_${tsk.TASK_ID}_${grId}`}],
+							[{text: 'Отправить задачу группе', callback_data: `offer_task_to_group_${tsk.TASK_ID}_${grId}`}],
+							[{text: 'Отменить предложение задачи группе', callback_data: `cancel_offer_task_to_group_${tsk.TASK_ID}_${grId}`}],
+							[{text: 'Удалить задачу', callback_data: `delete_task_${tsk.TASK_ID}_${grId}`}],
+							[{text: 'Назад', callback_data: `show_group_menu_${grId}`}]
+						]
+					}
+				});
+			}
+			tasks = await Tasks.findAll({where: {FOR_ALL: true, IS_COMPLETED: false, GROUP_ID: grId}, order: [['DEADLINE', 'ASC']]});
+			if (tasks.length === 0) { bot.sendMessage(chatId, 'Задачи для группы отсутствуют'); showGroupInfo(chatId, grId);} else {
+			bot.sendMessage(chatId, 'Вывод списка задач группы\n\n\nВывод списка задач группы');
+			for (tsk of tasks) {
+				bot.sendMessage(chatId, 'Задача "' + tsk.TITLE + '"\n  ' + tsk.DESCRIPTION + '\n', {
+					reply_markup: {
+						inline_keyboard: [
+							[{text: 'Удалить задачу (Нужны права куратора)', callback_data: `delete_task_${tsk.TASK_ID}_${grId}`}],
+							[{text: 'Назад', callback_data: `show_group_menu_${grId}`}]
+						]
+					}
+				});
+			}
+			}
+		}
+	}
+	else if (action.startsWith('delete_task_')) { // +
+    try {
+        const actionParts = action.replace('delete_task_', '').split('_');
+        const tskId = parseInt(actionParts[0]);
+        const grId = parseInt(actionParts[1]);
+        
+        if (isNaN(tskId) || isNaN(grId)) {
+            throw new Error('Некорректные значения taskId или groupId');
+        }
+
+        console.log('taskId:', tskId);
+        console.log('groupId:', grId);
+
+        const tsk = await Tasks.findOne({ where: { TASK_ID: tskId } });
+
+        if (!tsk) {
+            bot.sendMessage(chatId, 'Задача не найдена!');
+        } else {
+            const usr = await Users.findOne({ where: { TELEGRAM_ID: chatId } });
+
+            if (!usr) {
+                bot.sendMessage(chatId, 'Пользователь не найден!');
+                return;
+            }
+
+            const usrGr = await UserGroups.findOne({ where: { USER_ID: usr.USER_ID, GROUP_ID: grId } });
+
+            if (!usrGr) {
+                bot.sendMessage(chatId, 'Вы не состоите в этой группе!');
+                return;
+            }
+
+            if ((tsk.FOR_ALL === true && usrGr.ROLE !== 'student') || tsk.FOR_ALL === false) {
+                await Tasks.destroy({ where: { TASK_ID: tskId } });
+                bot.sendMessage(chatId, 'Задача удалена');
+            } else {
+                bot.sendMessage(chatId, 'У вас недостаточно прав для удаления задачи');
+            }
+        }
+
+        showGroupInfo(chatId, grId);
+    } catch (error) {
+        console.error('Ошибка при удалении задачи:', error);
+        bot.sendMessage(chatId, 'Произошла ошибка при удалении задачи.');
+    }
+    return;
+}
+	else if (action.startsWith('cancel_offer_task_to_group_')) { // ?
+		const tskId = parseInt(action.replace('cancel_offer_task_to_group_', '').split('_')[0]);
+		const grId = parseInt(action.replace('cancel_offer_task_to_group_', '').split('_')[1]);
+		const tsk = await Tasks.findOne({where: {TASK_ID: tskId}});
+		if (!tsk) {
+			bot.sendMessage(chatId, 'Задача не найдена!');
+		}
+		else {
+			await Tasks.update(
+				{ IS_OFFER_FOR_ALL: false },
+				{ where: { TASK_ID: tskId } }
+			);
+			bot.sendMessage(chatId, 'Задача видна только вам');
+		}
+		showGroupInfo(chatId, grId);
+		return;
+	}
+	else if (action.startsWith('offer_task_to_group_')) { // ?
+		const tskId = parseInt(action.replace('offer_task_to_group_', '').split('_')[0]);
+		const grId = parseInt(action.replace('offer_task_to_group_', '').split('_')[1]);
+		const tsk = await Tasks.findOne({where: {TASK_ID: tskId}});
+		if (!tsk) {
+			bot.sendMessage(chatId, 'Задача не найдена!');
+		}
+		else {
+			await Tasks.update({IS_OFFER_FOR_ALL: true}, {where: {TASK_ID: tskId}});
+			bot.sendMessage(chatId, 'Заявка на задачу для группы отправлена');
+		}
+		showGroupInfo(chatId, grId);
+		return;
+	}
+	else if (action.startsWith('complete_task_')) { // +
+		const tskId = parseInt(action.replace('complete_task_', '').split('_')[0]);
+		const grId = parseInt(action.replace('complete_task_', '').split('_')[1]);
+		const tsk = await Tasks.findOne({where: {TASK_ID: tskId}});
+		if (!tsk) {
+			bot.sendMessage(chatId, 'Задача не найдена!');
+		} 
+		else {
+			await Tasks.update({IS_COMPLETED: true}, {where: {TASK_ID: tskId}});
+			bot.sendMessage(chatId, 'Задача выполнена!');
+		}
+		showGroupInfo(chatId, grId);
+		return;
+	}
+	else if (action.startsWith('add_task_')) { // +
+    const grId = parseInt(action.replace('add_task_', '')); // group id
+    bot.sendMessage(chatId, 'Введите информацию о вашей задаче, согласно шаблону:');
+    bot.sendMessage(chatId, '[Заголовок задачи]\n[Описание задачи]\n[Дата дедлайна YYYY-MM-DD]');
+    bot.sendMessage(chatId, 'Пример:\nЗакончить проект по математике\nЗакончить проект, связанный с докладом по математике\n2024-12-31');
+    bot.sendMessage(chatId, 'Введите "Назад", чтобы вернуться обратно');
+
+    bot.on('message', async (msg) => {
+        if (msg.text === 'Назад' || msg.text.toLowerCase() === 'назад') {
+            showGroupInfo(chatId, grId);
+            return;
+        }
+
+        const eventDetails = msg.text.split('\n');
+        
+        if (eventDetails.length !== 3) {
+            bot.sendMessage(chatId, 'Неправильный формат данных. Попробуйте снова.');
+            showGroupInfo(chatId, grId);
+            return;
+        }
+
+        try {
+            const usr = await Users.findOne({ where: { TELEGRAM_ID: chatId } });
+            if (!usr) {
+                bot.sendMessage(chatId, 'Пользователь не найден');
+                return;
+            }
+
+            const userId = usr.USER_ID;
+
+            // Проверка формата даты
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDetails[2])) {
+                bot.sendMessage(chatId, 'Неправильный формат даты. Попробуйте снова.\nПример:\nЗакончить проект по математике\nЗакончить проект, связанный с докладом по математике\n2024-12-31');
+                return;
+            }
+
+            await Tasks.create({
+                USER_ID: userId,
+                GROUP_ID: grId, 
+                TITLE: eventDetails[0],
+                DESCRIPTION: eventDetails[1],
+                DEADLINE: eventDetails[2]
+            });
+
+            console.log('Успешна задана задача с заголовком "' + eventDetails[0] + '", и содержанием "' + eventDetails[1] + '"');
+            bot.sendMessage(chatId, 'Успешно задана задача с заголовком "' + eventDetails[0] + '", и содержанием "' + eventDetails[1] + '" пользователем ' + chatId);
+        } catch (error) {
+            console.log('Ошибка при задании Task в таблицу Tasks', error);
+            bot.sendMessage(chatId, 'Ошибка при создании задачи!');
+        }
+
+        showGroupInfo(chatId, grId);
+    });
+}
 	else if (action.startsWith('add_subject_')) { // -
 		const grId = parseInt(action.replace('add_subject_', '')); //group id
 		bot.sendMessage(chatId, 'Введите название нового предмета (введите "Назад" чтобы вернуться): ');
-		bot.once('message', async (msg) => {
+		bot.on('message', async (msg) => {
 			try {
 			if (msg.text === 'Назад' || msg.text === 'назад') {
 				showGroupInfo(chatIt, grId);
@@ -1021,53 +915,148 @@ bot.on('callback_query', async (callbackQuery) => {
 		showGroupInfo(chatId, grId);
 		return;
 	}
-	else if (action.startsWith('requests_tasks_')) { // - ez
+	else if (action.startsWith('requests_tasks_')) { // +
 		const grId = parseInt(action.replace('requests_tasks_', '')); //group id
-		
+		try {
+		const usr = Users.findOne({where: {TELEGRAM_ID: chatId}});
+		const findRole = UserGroups.findOne({where: {USER_ID: usr.USER_ID, GROUP_ID: grId}});
+		} catch (error) {
+			console.log('Пользователь не найден в БД! ' + error);
+			bot.sendMessage(chatId, 'Пользователь не найден в БД');
+		}
+		if (findRole.ROLE !== 'student') {
+		const requests = await Tasks.findAll({where: {IS_OFFER_FOR_ALL: true, FOR_ALL: false}});
+		if (requests.length === 0) {
+			bot.sendMessage(chatId, 'Нет заявок на задачи для группы');
+		} else {
+			for (req of requests) {
+				bot.sendMessage(chatId, 'Задача "' + req.TITLE + '"\n  ' + req.DESCRIPTION + '\n', {
+					reply_markup: {
+						inline_keyboard: [
+							[{text: 'Принять задачу', callback_data: `approve_request_task_${req.TASK_ID}_${grId}`}],
+							[{text: 'Отклонить задачу', callback_data: `reject_request_task_${req.TASK_ID}_${grId}`}],
+							[{text: 'Назад', callback_data: `show_group_menu_${grId}`}]
+						]
+					}
+				});
+			}
+		}
+		} else {
+			bot.sendMessage(chatId, 'У вас недостаточно прав для просмотра заявок задач');
+		}			
+	}
+	else if (action.startsWith('reject_request_task_')) { // +
+		const tskId = parseInt(action.replace('approve_request_task_', '').split('_')[0]);
+		const grId = parseInt(action.replace('approve_request_task_', '').split('_')[1]);
+		const tsk = await Tasks.findOne({where: {TASK_ID: tskId}});
+		if (!tsk) {
+			bot.sendMessage(chatId, 'Задача не найдена');
+		} 
+		else {
+			await Tasks.update({FOR_ALL: false, IS_OFFER_FOR_ALL: false}, {where: {TASK_ID: tskId}});
+			bot.sendMessage(chatId, 'Задача была отклонена');
+		}
+		showGroupInfo(chatId, grId);
+		return;
+	}
+	else if (action.startsWith('approve_request_task_')) { // +
+		const tskId = parseInt(action.replace('approve_request_task_', '').split('_')[0]);
+		const grId = parseInt(action.replace('approve_request_task_', '').split('_')[1]);
+		const tsk = await Tasks.findOne({where: {TASK_ID: tskId}});
+		if (!tsk) {
+			bot.sendMessage(chatId, 'Задача не найдена');
+		} 
+		else {
+			await Tasks.update({FOR_ALL: true}, {where: {TASK_ID: tskId}});
+			bot.sendMessage(chatId, 'Задача была закреплена для группы');
+		}
+		showGroupInfo(chatId, grId);
+		return;
 	}
 	else if (action.startsWith('subject_list_')) { // - hard
 		const grId = parseInt(action.replace('subject_list_', '')); //group id
 		
 	}
-	else if (action.startsWith('requests_join_')) { // - ez
-		const grId = parseInt(action.replace('requests_join_', '')); //group id
-		const requestsToGroup = await GroupRequests.findAll({where: {GROUP_ID: groupId, IS_APPROVED: false}});
-		if (requestsToGroup.length === 0)
-		{
-			bot.sendMessage(chatId, 'Заявок на вступление в группу нет');
+	else if (action.startsWith('requests_join_')) { // ?
+    const groupId = parseInt(action.replace('requests_join_', '')); // group id
+    try {
+        const findGroupById = await GroupStud.findOne({ where: { GROUP_ID: groupId } });
+        const requestsToGroup = await GroupRequests.findAll({ where: { GROUP_NAME: findGroupById.GROUP_NAME, IS_APPROVED: false } });
+        
+        if (requestsToGroup.length === 0) {
+            bot.sendMessage(chatId, 'Заявок на вступление в группу нет');
+        } else {
+            const keyboard = [];
+            for (const rtg of requestsToGroup) {
+                const usr = await Users.findOne({ where: { USER_ID: rtg.REQUESTER_ID } });
+                if (usr) {
+                    keyboard.push([{ text: usr.USERNAME, callback_data: `show_user_request_${usr.USER_ID}_${groupId}` }]);
+                }
+            }
+            keyboard.push([{ text: 'Назад', callback_data: `show_group_menu_${groupId}` }]);
+
+            // Вывод заявок на вступление в группу в виде кнопок:
+            bot.sendMessage(chatId, 'Список заявок на вступление в группу:', {
+                reply_markup: {
+                    inline_keyboard: keyboard
+                }
+            });
+        }
+    } catch (error) {
+        console.log('Ошибка при отображении списка заявок на вступление в группу: ' + error);
+        bot.sendMessage(chatId, 'Ошибка при отображении списка заявок на вступление в группу');
+    }
+    showGroupInfo(chatId, groupId);
+    return;
+}
+	else if (action.startsWith('send_notification_')) { // +
+		const grId = parseInt(action.replace('send_notification_', '')); //group id
+		const usr = await Users.findOne({where: {TELEGRAM_ID: chatId}});
+		if(!usr) {
+			bot.sendMessage(chatId, 'Пользователь не найден');
 		} else {
-			const keyboard = [];
-			for (const rtg of requestsToGroup) {
-				const usr = await Users.findOne({ where: { GROUP_ID: rtg.REQUESTER_ID } });
-				if (usr) {
-					keyboard.push([{ text: usr.USER_NAME, callback_data: `show_user_request_${usr.REQUESTER_ID}_${grId}` }]);
+			const usrgr = await UserGroups.findOne({where: {USER_ID: usr.USER_ID, GROUP_ID: grId}});
+			if (!usrgr) {
+				bot.sendMessage(chatId, 'Пользователь не состоит в группе!');
+			} else {
+				if (usrgr.ROLE !== 'student') {
+					bot.sendMessage(chatId, 'Введите сообщение для группы (либо "Назад"):');
+					bot.on('message', async (msg) => {
+						if (msg.text === 'Назад' || msg.text === 'назад') {
+							showGroupInfo(chatId, grId);
+						} else {
+							const joiners = await UserGroups.findAll({where: {GROUP_ID: grId}});
+							if (joiners.length === 0) {
+								bot.sendMessage(chatId, 'Пользователей в данной группе не найдено');
+							} else {
+								for (joins of joiners) {
+									const u = await Users.findOne({where: {USER_ID: joins.USER_ID}});
+									bot.sendMessage(u.TELEGRAM_ID, msg.text);
+								}
+								bot.sendMessage(chatId, 'Сообщения успешно отправлены всем участникам группы');
+							}
+								showGroupInfo(chatId, grId);
+								return;
+						}
+					});
+				} 
+				else {
+					bot.sendMessage(chatId, 'Недостаточно прав для отправки уведомлений');
+					showGroupInfo(chatId, grId);
+					return;
 				}
 			}
-			keyboard.push([{ text: 'Назад', callback_data: 'back_main' }]);
-			
-			//Вывод заявок на вступление в группу в виде кнопок:
-			bot.sendMessage(chatId, 'Список заявок на вступление в группу:', {
-				reply_markup: {
-					inline_keyboard: keyboard
-				}
-			});
-			
 		}
-		showGroupInfo(chatId, grId);
-		return;
-	}
-	else if (action.startsWith('send_notification_')) { // - ez
-		const grId = parseInt(action.replace('send_notification_', '')); //group id
-		
+
 	} 
 	else if (action === 'alarm_all') { // +
 		bot.sendMessage(chatId, 'Напишите сообщение для каждого пользователя ("Назад", чтобы вернуться в главное меню): ');
-		bot.once('message', (msg) => {
+		bot.on('message', async (msg) => {
 			if (msg.text === 'Назад' || msg.text === 'назад') {
 				showMainMenu(chatId);
 				return;
 			} else {
-				const allUsers = Users.findAll();
+				const allUsers = await Users.findAll();
 				for (usr of allUsers)
 				{
 					bot.sendMessage(usr.TELEGRAM_ID, msg.text);
@@ -1077,28 +1066,156 @@ bot.on('callback_query', async (callbackQuery) => {
 			handleNotification(chatId);
 		});
 	}
-	else if (action === 'alarm_group') { // -
-		
+	else if (action === 'alarm_group') { // +
+		bot.sendMessage(chatId, 'Введите название группы, участникам которой будут направлены сообщения: ');
+		bot.on('message', async (msg) => {
+			if (msg.text === 'Назад' || msg.text === 'назад') {
+				showMainMenu(chatId);
+			} else {
+				const gr = await GroupStud.findOne({where: {GROUP_NAME: msg.text}});
+				if (!gr) {
+					bot.sendMessage(chatId, 'Учебная группа с таким названием не найдена');
+					showMainMenu(chatId);
+				}
+				else {
+					bot.sendMessage(chatId, 'Учебная группа найдена, введите сообщение, которое нужно отправить участникам группы: ');
+					bot.on('message', async (msg) => {
+						if (msg.text === 'Назад' || msg.text === 'назад') {
+							showMainMenu(chatId);
+						} else {
+							const usrs = await UserGroups.findAll({where: {GROUP_ID: gr.GROUP_ID}});
+							for (us of usrs) {
+								const tg = await Users.findOne({where: {USER_ID: us.USER_ID}});
+								bot.sendMessage(tg.TELEGRAM_ID, msg.text);
+							}
+							bot.sendMessage(chatId, 'Сообщения успешно направлены участникам группы');
+							showMainMenu(chatId);
+						}
+					});
+				}
+			}
+		});
+		return;
 	}
-	else if (action === 'alarm_user') { // -
-		
+	else if (action === 'alarm_user') { // +
+		bot.sendMessage(chatId, 'Введите telegram ID пользователя, которому нужно направить уведомление (Либо "Назад"): ');
+		bot.on('message', async (msg) => {
+			if (msg.text === 'Назад' || msg.text === 'назад') {
+				showMainMenu(chatId);
+			} 
+			else {
+				const tgId = parseInt(msg.text);
+				const usr = await Users.findOne({where: {TELEGRAM_ID: tgId}});
+				if (!usr)
+				{
+					bot.sendMessage(chatId, 'Пользователь с таким ID не найден!');
+					showMainMenu(chatId);
+				} else {
+					bot.sendMessage(chatId, 'Пользователь найден, введите сообщение для него: ');
+					bot.on('message', async (msg) => {
+						if (msg.text === 'Назад' || msg.text === 'назад') {
+							showMainMenu(chatId);
+						} 
+						else {
+							bot.sendMessage(usr.TELEGRAM_ID, msg.text);
+							bot.sendMessage(chatId, 'Сообщение "' + msg.text + '" отправлено пользователю ' + usr.TELEGRAM_ID);
+							showMainMenu(chatId);
+						}
+					});
+				}
+			}
+		});
+		return;
 	}
-	else if (action.startsWith('show_user_request_')) { // Для вывода кнопок пользователя-заявителя в группу (-)
-		const words = action.replace('show_user_request_', '');
+	else if (action.startsWith('show_user_request_')) { // ?
+    const words = action.replace('show_user_request_', '');
+    const reqId = parseInt(words.split('_')[0]);
+    const grId = parseInt(words.split('_')[1]);
+    try {
+		const grName = await GroupStud.findOne({where: {GROUP_ID: grId}});
+        const usr = await GroupRequests.findOne({ where: { REQUESTER_ID: reqId, GROUP_NAME: grName.GROUP_NAME, IS_APPROVED: false } });
+        if (!usr) {
+            bot.sendMessage(chatId, 'Пользователь не найден');
+        } else {
+            // Вывод информации о пользователе и кнопок (Принять) (Удалить) (Назад):
+            bot.sendMessage(chatId, `Выберите действие:`, {
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: 'Принять заявку', callback_data: `accept_request_group_${reqId}_${grId}` }],
+                        [{ text: 'Удалить заявку', callback_data: `reject_request_group_${reqId}_${grId}` }],
+                        [{ text: 'Назад', callback_data: `show_group_menu_${grId}` }]
+                    ]
+                }
+            });
+        }
+    } catch (error) {
+        console.log('Ошибка при просмотре профиля пользователя, подавшего заявку ' + error);
+        bot.sendMessage(chatId, 'Ошибка при просмотре профиля пользователя, подавшего заявку');
+    }
+    showGroupInfo(chatId, grId);
+    return;
+}
+	else if (action.startsWith('delete_event_')) { // ?? gp
+        const eventId = action.replace('delete_event_', '');
+
+        try {
+            await Events.destroy({ where: { EVENT_ID: eventId } });
+            bot.sendMessage(chatId, 'Мероприятие успешно удалено.');
+            // Отправляем обновленный список мероприятий после удаления
+            const currentDate = new Date().toISOString().split('T')[0]; 
+            const events = await sequelize.query(
+                'SELECT * FROM EVENTS WHERE EVENT_DATE >= :currentDate',
+                {
+                    replacements: { currentDate },
+                    type: QueryTypes.SELECT
+                }
+            );
+
+            if (events.length === 0) {
+                bot.sendMessage(chatId, 'Нет предстоящих мероприятий.');
+            } else {
+                const eventMessages = events.map(event => {
+                    return {
+                        text: `Название: ${event.EVENT_NAME}\nДата: ${event.EVENT_DATE}\nВремя: ${event.EVENT_TIME}\nМесто: ${event.LOCATION}\nОписание: ${event.DESCRIPTION}`,
+                        callback_data: `delete_event_${event.EVENT_ID}`
+                    };
+                });
+
+                const inlineKeyboard = eventMessages.map(event => [
+                    { text: event.text, callback_data: event.callback_data },
+                    { text: 'Удалить', callback_data: `delete_event_${event.callback_data.split('_')[2]}` }
+                ]);
+
+                bot.sendMessage(chatId, 'Предстоящие мероприятия:', {
+                    reply_markup: {
+                        inline_keyboard: inlineKeyboard
+                    }
+                });
+            }
+            return;
+        } catch (error) {
+            console.error('Ошибка при удалении мероприятия:', error);
+            bot.sendMessage(chatId, 'Произошла ошибка при удалении мероприятия.');
+            return;
+        }
+    }
+	else if (action.startsWith('accept_request_group_')) { // +
+		const words = action.replace('accept_request_group_', '');
 		const reqId = parseInt(words.split('_')[0]);
 		const grId = parseInt(words.split('_')[1]);
-		try { // Сейчас здесь просто true (принятие) пользователя в группу
-			const usr = await GroupRequests.findOne({where: {REQUESTER_ID: reqId, GROUP_ID: grId, IS_APPROVED: false}});
+		try {
+			const grName = await GroupStud.findOne({where: {GROUP_ID: grId}});
+			const usr = await GroupRequests.findOne({where: {REQUESTER_ID: reqId, GROUP_NAME: grName.GROUP_NAME, IS_APPROVED: false}});
 			if (!usr) {
 				bot.sendMessage(chatId, 'Пользователь не найден');
 			} else {
-				//Update + Create
-				await GroupRequests.update({IS_APPROVED: true}, {where: {REQUESTER_ID: reqId, GROUP_ID: grId, IS_APPROVED: false}});
+				await GroupRequests.update({IS_APPROVED: true}, {where: {REQUESTER_ID: reqId, GROUP_NAME: grName.GROUP_NAME, IS_APPROVED: false}});
 				await UserGroups.create({
 					USER_ID: reqId,
 					GROUP_ID: grId,
 					ROLE: 'student'
 				});
+				bot.sendMessage(chatId, 'Студент успешно зачислен в группу!');
 			}
 		} catch (error) {
 			console.log('Ошибка при просмотре профиля пользователя, подавшего заявку');
@@ -1106,6 +1223,44 @@ bot.on('callback_query', async (callbackQuery) => {
 		}
 		showGroupInfo(chatId, grId);
 		return;
+	}
+	else if (action.startsWith('reject_request_group_')) { // +
+		const words = action.replace('reject_request_group_', '');
+		const reqId = parseInt(words.split('_')[0]);
+		const grId = parseInt(words.split('_')[1]);
+		try {
+			const grName = await GroupStud.findOne({where: {GROUP_ID: grId}});
+			const usr = await GroupRequests.findOne({where: {REQUESTER_ID: reqId, GROUP_NAME: grName.GROUP_NAME, IS_APPROVED: false}});
+			if (!usr) {
+				bot.sendMessage(chatId, 'Пользователь не найден');
+			} else {
+				await GroupRequests.destroy({where: {REQUESTER_ID: reqId, GROUP_NAME: grName.GROUP_NAME, IS_APPROVED: false}});
+				bot.sendMessage(chatId, 'Заявка успешно отклонена и удалена');
+			}
+		} catch (error) {
+			console.log('Ошибка при просмотре профиля пользователя, подавшего заявку');
+			bot.sendMessage(chatId, 'Ошибка при просмотре профиля пользователя, подавшего заявку');
+		}
+		showGroupInfo(chatId, grId);
+		return;
+	}
+	else if (action === 'create_group') {
+		handleCreateGroup(chatId);
+	}
+	else if (action === 'requests_on_create_group') {
+		handleGroupRequests(chatId);
+	}
+	else if (action === 'info_my_groups') {
+		handleMyGroupsInfo(chatId);
+	}
+	else if (action === 'join_to_group') {
+		handleJoinGroup(chatId);
+	}
+	else if (action === 'notif') {
+		handleNotification(chatId);
+	}
+	else if (action === 'events') {
+		handleEvent(chatId);
 	}
 });
 
@@ -1229,3 +1384,46 @@ cron.schedule('0 9 * * *', () => { // Выполняется каждый ден
     checkAndSendNotificationsEvents(2);
     checkAndSendNotificationsEvents(1);
 });
+
+// Функция для отправки уведомлений о дедлайне задач
+async function checkAndSendTaskNotifications(daysBeforeDeadline) {
+    try {
+        const date = new Date();
+        date.setDate(date.getDate() + daysBeforeDeadline);
+        const targetDate = date.toISOString().split('T')[0]; // Получаем дату в формате YYYY-MM-DD
+
+        // Ищем задачи, у которых DEADLINE совпадает с targetDate
+        const tasks = await Tasks.findAll({
+            where: {
+                DEADLINE: targetDate,
+				FOR_ALL: false
+            }
+        });
+
+        for (const task of tasks) {
+            const user = await Users.findOne({ where: { USER_ID: task.USER_ID } });
+            if (user) {
+                const chatId = user.TELEGRAM_ID;
+
+                // Отправка уведомления (реализуйте вашу логику отправки уведомлений)
+                sendNotification(chatId, `У вас есть задача с дедлайном через ${daysBeforeDeadline} дней: ${task.TITLE}`);
+            }
+        }
+    } catch (error) {
+        console.error('Ошибка при отправке уведомлений о задачах:', error);
+    }
+}
+
+// Добавляем расписание cron для отправки уведомлений о дедлайне задач каждому пользователю, который записан в USER_ID
+cron.schedule('0 9 * * *', () => { // Выполняется каждый день в 0 минут, 9 часов.
+    checkAndSendTaskNotifications(7);
+    checkAndSendTaskNotifications(3);
+    checkAndSendTaskNotifications(2);
+    checkAndSendTaskNotifications(1);
+});
+
+// Ваша логика отправки уведомлений
+function sendNotification(chatId, message) {
+    // Реализуйте логику отправки уведомления пользователю в Telegram
+    console.log(`Отправка уведомления пользователю ${chatId}: ${message}`);
+}
