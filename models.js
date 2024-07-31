@@ -86,6 +86,10 @@ const Subjects = sequelize.define('Subjects', {
 	CREATOR_TELEGRAM_ID: {
 		type: DataTypes.INTEGER,
 		allowNull: false
+	},
+	IS_FOR_ALL: {
+		type: DataTypes.BOOLEAN,
+		defaultValue : false
 	}
 }, {
     tableName: 'SUBJECTS',
@@ -308,16 +312,46 @@ const UserStates = sequelize.define('UserState', {
     STATE: {
         type: DataTypes.STRING(255),
         allowNull: false
-    }
+    },
+	GROUP_ID: {
+		type: DataTypes.INTEGER,
+		allowNull: true
+	},
+	EVENT_ID: {
+		type: DataTypes.INTEGER,
+		allowNull: true
+	},
+	USER_ID: {
+		type: DataTypes.BIGINT,
+		allowNull: true
+	},
+	TASK_ID: {
+		type: DataTypes.INTEGER,
+		allowNull: true
+	},
+	SUBJECT_ID: {
+		type: DataTypes.INTEGER,
+		allowNull: true
+	},
+	GROUP_NAME: {
+		type: DataTypes.STRING(255),
+		allowNull: true
+	},
+	REQUEST_ID: {
+		type: DataTypes.INTEGER,
+		allowNull: true
+	}
 }, {
+	tableName: 'UserStates',
     timestamps: false
 });
 
-//sequelize.sync({force: true}).then(result=>{
-//  console.log(result);
-//})
-//.catch(err=> console.log(err));
-
+/*
+sequelize.sync({force: true}).then(result=>{
+  console.log(result);
+})
+.catch(err=> console.log(err));
+*/
 module.exports = {
     sequelize,
     GroupStud,
