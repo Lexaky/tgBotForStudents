@@ -697,7 +697,7 @@ const handleGroupRequests = async (chatId) => {
         // Проверка на права администратора пользователя телеграм
         if (user.ROLE_GLOBAL === 'admin') {
             try {
-                // Получаем заявки на создание групп и включаем пользователей
+                // Получаю заявки на создание групп и включаем пользователей
                 const requests = await GroupStud.findAll({
                     where: { IS_APPROVED: false }
                 });
@@ -1271,7 +1271,6 @@ bot.sendMessage(chatId, 'Введите информацию о вашей за�
 	await setState(chatId, 'ADD_TASK_STATE', { groupId: grId });
 };
 
-//Доделать и есть состояние
 const handleAddSubject = async (chatId, grId) => {
 	bot.sendMessage(chatId, 'Введите название нового предмета (введите "Назад" чтобы вернуться): ');
 	await setState(chatId, 'ADD_SUBJECT_STATE', {groupId: grId});
@@ -1798,7 +1797,7 @@ bot.on('callback_query', async (callbackQuery) => {
         if (event.length === 0) {
             bot.sendMessage(chatId, 'Мероприятие не найдено.');
         } else {
-            const eventData = event[0]; // Поскольку query возвращает массив, берем первый элемент
+            const eventData = event[0]; 
 
             // Формируем сообщение с информацией о мероприятии
             const message = `Название: ${eventData.EVENT_NAME}\n` +
@@ -1975,7 +1974,7 @@ async function checkAndSendTaskNotifications(daysBeforeDeadline) {
             if (user) {
                 const chatId = user.TELEGRAM_ID;
 
-                // Отправка уведомления (реализуйте вашу логику отправки уведомлений)
+                // Отправка уведомления
                 sendNotification(chatId, `У вас есть задача с дедлайном через ${daysBeforeDeadline} дней: ${task.TITLE}`);
             }
         }
