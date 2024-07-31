@@ -972,8 +972,8 @@ const handleChangeUserRole = async (action, chatId) => {
 if (action.startsWith('make_admin_')) {
 			let act = action.replace('make_admin_', '');
 			console.log('act: ' + act);
-		const userId = parseInt(act.split('_')[0]);
-		const groupId = parseInt(act.split('_')[1]); 
+		const userId = parseInt(act.split('_')[1]);
+		const groupId = parseInt(act.split('_')[0]); 
 		console.log('UserID: ' + userId + ' GroupId: ' + groupId + ' получил права администратора');
 			try {
 				await UserGroups.update({ROLE: 'admin'}, {where: {USER_ID: userId, GROUP_ID: groupId}});
@@ -986,8 +986,8 @@ if (action.startsWith('make_admin_')) {
 		else if (action.startsWith('make_curator_')) {
 			let act = action.replace('make_curator_', '');
 			console.log('act: ' + act);
-		const userId = parseInt(act.split('_')[0]);
-		const groupId = parseInt(act.split('_')[1]);
+		const userId = parseInt(act.split('_')[1]);
+		const groupId = parseInt(act.split('_')[0]);
 		console.log('UserID: ' + userId + ' GroupId: ' + groupId + ' получил права куратора');
 			try {
 				await UserGroups.update({ROLE: 'curator'}, {where: {USER_ID: userId, GROUP_ID: groupId}});
@@ -1000,8 +1000,8 @@ if (action.startsWith('make_admin_')) {
 		else if (action.startsWith('make_student_')) {
 			let act = action.replace('make_student_', '');
 			console.log('act: ' + act);
-		const userId = parseInt(act.split('_')[0]);
-		const groupId = parseInt(act.split('_')[1]);
+		const userId = parseInt(act.split('_')[1]);
+		const groupId = parseInt(act.split('_')[0]);
 		console.log('UserID: ' + userId + ' GroupId: ' + groupId + ' получил права студента');
 			try {
 				await UserGroups.update({ROLE: 'student'}, {where: {USER_ID: userId, GROUP_ID: groupId}});
