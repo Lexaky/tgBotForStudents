@@ -453,6 +453,7 @@ bot.on('message', async (msg) => {
 			showGroupInfo(currentState.GROUP_ID);
 			await setState(chatId, 'SLEEP');
 		}
+		await setState(chatId, 'SLEEP');
 	break;
 	case 'GROUP_NOTIFICATE':
 		if (msg.text === 'Назад' || msg.text === 'назад') {
@@ -479,25 +480,34 @@ bot.on('message', async (msg) => {
         showGroupInfo(chatId, currentState.GROUP_ID);
     } else {
         if (msg.text.split('\n').length === 3) {
-            const dateSplit = msg.text.split('\n')[0];
+            const groupIdGo = currentState.GROUP_ID;
+			console.log('GROUP_ID IN STATE DEL_DATE_TIME_SUBJECT: ' + groupIdGo + ';;; chatId: ' + chatId);
+			const dateSplit = msg.text.split('\n')[0];
             const timeSplit = msg.text.split('\n')[1];
             const dataPlsWork = msg.text.split('\n')[0];
 			const subjNameToFind = msg.text.split('\n')[2];
             const subjTryFind = await Subjects.findOne({ where: { SUBJECT_NAME: subjNameToFind, GROUP_ID: currentState.GROUP_ID } });
-            const subjIdToDelete = subjTryFind.SUBJECT_ID;
+            if (!subjTryFind)
+			{
+				bot.sendMessage(chatId, 'Введённый учебный предмет не найден, проверьте корректность написания!');
+				await showGroupInfo(chatId, currentState.GROUP_ID);
+				await setState(chatId, 'SLEEP');
+				return;
+			}
+			const subjIdToDelete = subjTryFind.SUBJECT_ID;
 
             console.log('БЫЛИ ВВЕДЕНЫ ДАННЫЕ ДЛЯ УДАЛЕНИЯ ПРЕДМЕТА: ' + dateSplit + ' - ' + timeSplit + ' - ' + subjNameToFind + ' - ' + subjIdToDelete);
 
             if (!/^\d{4}-\d{2}-\d{2}$/.test(dateSplit)) {
                 bot.sendMessage(msg.chat.id, 'Неверный формат даты. Пожалуйста, используйте формат YYYY-MM-DD.');
-                showGroupInfo(chatId, currentState.GROUP_ID);
+                await showGroupInfo(chatId, currentState.GROUP_ID);
                 await setState(chatId, 'SLEEP');
                 return;
             }
 
             if (!/^\d{2}:\d{2}:\d{2}$/.test(timeSplit)) {
                 bot.sendMessage(msg.chat.id, 'Неверный формат времени. Пожалуйста, используйте формат HH:MM:SS.');
-                showGroupInfo(chatId, currentState.GROUP_ID);
+                await showGroupInfo(chatId, currentState.GROUP_ID);
                 await setState(chatId, 'SLEEP');
                 return;
             }
@@ -507,15 +517,15 @@ bot.on('message', async (msg) => {
 			
             const date = new Date(year, month - 1, day);
             if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
-                bot.sendMessage(msg.chat.id, 'Введена несуществующая дата.');
-                showGroupInfo(chatId, currentState.GROUP_ID);
+                bot.sendMessage(chatId, 'Введена несуществующая дата.');
+                await showGroupInfo(chatId, currentState.GROUP_ID);
                 await setState(chatId, 'SLEEP');
                 return;
             }
 
             if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) {
                 bot.sendMessage(msg.chat.id, 'Введено некорректное время.');
-                showGroupInfo(chatId, currentState.GROUP_ID);
+                await showGroupInfo(chatId, currentState.GROUP_ID);
                 await setState(chatId, 'SLEEP');
                 return;
             }
@@ -554,23 +564,24 @@ bot.on('message', async (msg) => {
 					}
 				}
 				
-                showGroupInfo(chatId, currentState.GROUP_ID);
+                await showGroupInfo(chatId, currentState.GROUP_ID);
                 await setState(chatId, 'SLEEP');
             } catch (error) {
                 console.error('Ошибка при удалении записи из расписания:', error);
                 bot.sendMessage(msg.chat.id, 'Произошла ошибка при удалении предмета из расписания');
-                showGroupInfo(chatId, currentState.GROUP_ID);
+                await showGroupInfo(chatId, currentState.GROUP_ID);
                 await setState(chatId, 'SLEEP');
             }
         } else {
             bot.sendMessage(chatId, 'Неправильный формат данных');
-            showGroupInfo(chatId, currentState.GROUP_ID);
+            await showGroupInfo(chatId, currentState.GROUP_ID);
             await setState(chatId, 'SLEEP');
         }
     }
 } catch (error) {
-    bot.sendMessage(msg.chat.id, 'Неверный формат даты. Пожалуйста, используйте формат YYYY-MM-DD.');
-    showGroupInfo(currentState.GROUP_ID);
+	bot.sendMessage(msg.chat.id, 'Неверный формат даты. Пожалуйста, используйте формат YYYY-MM-DD.');
+	console.log('ОПИСАНИЕ ОШИБКИ: ' + error);
+	await showGroupInfo(chatId, currentState.GROUP_ID);
     await setState(chatId, 'SLEEP');
 }
 	break;
@@ -1405,7 +1416,15 @@ const handleSubjectMenu = async (chatId, subjId, groupId) => {
 };
 
 const handleRequestsJoin = async (chatId, groupId) => {
-try {
+	try {
+		const f1 = await Users.findOne({where: {TELEGRAM_ID: chatId}});
+		const f2 = await UserGroups.findOne({where: {USER_ID: f1.USER_ID, GROUP_ID: groupId}});
+		if (f2.ROLE === 'student') {
+			bot.sendMessage(chatId, 'У вас недостаточно прав для доступа к заявкам');
+			await showGroupInfo(chatId, groupId);
+			return;
+		}
+		
         const findGroupById = await GroupStud.findOne({ where: { GROUP_ID: groupId } });
         const requestsToGroup = await GroupRequests.findAll({ where: { GROUP_NAME: findGroupById.GROUP_NAME, IS_APPROVED: false } });
         
@@ -1551,9 +1570,22 @@ const handleDeleteFromSchedule = async (chatId, grId, subjId) => {
 };
 
 const handleDeleteSubjectFromSchedule = async (chatId, grId) => {
-	bot.sendMessage(chatId, 'Введите дату, время и предмет по шаблону удаляемого предмета(или "назад"):\n[Дата YYYY-MM-DD]\n[Время HH:MM:SS]\n[Название предмета]');
-	bot.sendMessage(chatId, 'Например,\n2024-08-31\n12:30:00\nРусский язык');
-	await setState(chatId, 'DEL_DATE_TIME_SUBJECT', {groupId: grId});
+	const getRightsOfParticipant = await Users.findOne({where: {TELEGRAM_ID: chatId}});
+	if (!getRightsOfParticipant) {
+		bot.sendMessage(chatId, 'Пользователь не найден');
+		await showGroupInfo(chatId, grId);
+	} else {
+		const getRoleOP = await UserGroups.findOne({where: {USER_ID: getRightsOfParticipant.USER_ID, GROUP_ID: grId}});
+		if (getRoleOP.ROLE !== 'student') {
+		bot.sendMessage(chatId, 'Введите дату, время и предмет по шаблону удаляемого предмета(или "назад"):\n[Дата YYYY-MM-DD]\n[Время HH:MM:SS]\n[Название предмета]');
+		bot.sendMessage(chatId, 'Например,\n2024-08-31\n12:30:00\nРусский язык');
+		console.log('GROUP_ID FROM handleDeleteSubjectFromSchedule: ' + grId);
+		await setState(chatId, 'DEL_DATE_TIME_SUBJECT', {groupId: grId});
+		} else {
+			bot.sendMessage(chatId, 'Недостаточно прав');
+			await showGroupInfo(chatId, grId);
+		}
+	}
 };
 // Обработка нажатий на кнопки
 bot.on('callback_query', async (callbackQuery) => {
