@@ -2,6 +2,8 @@ const TelegramBot = require('node-telegram-bot-api');
 const cron = require('node-cron');
 const { sequelize, GroupStud, Users, Subjects, UserGroups, Tasks, Schedule, Events, Notifications, GroupRequests, UserStates } = require('./models');
 const { Sequelize, DataTypes, QueryTypes, Op } = require('sequelize');
+const { createCanvas } = require('canvas');
+const fs = require('fs');
 // Инициализация бота
 const token = '7345012579:AAEpRCqweK2FLpRMfILGIf4Y9geDkpGdlHw';
 const bot = new TelegramBot(token, { polling: true });
@@ -55,8 +57,8 @@ const showMainMenu = (chatId) => {
 	bot.sendMessage(chatId, 'Главное меню', {
         reply_markup: {
             inline_keyboard: [
-                [{ text: 'Создать группу', callback_data: `create_group` }],
-                [{ text: 'Заявки на создание групп', callback_data: `requests_on_create_group` }, 
+                [{ text: 'Добавить группу', callback_data: `create_group` }],
+                [{ text: 'Группы, что ожидают добавление', callback_data: `requests_on_create_group` }, 
 				{ text: 'Информация о моих группах', callback_data: `info_my_groups` }],
                 [{ text: 'Вступить в группу', callback_data: `join_to_group` }],
                 [{ text: 'Уведомления', callback_data: `notif` }, { text: 'Мероприятия', callback_data: `events` }]
@@ -73,7 +75,7 @@ const showGroupInfo = async (chatId, groupId) => {
         reply_markup: {
             inline_keyboard: [
                 [{ text: 'Расписание занятий', callback_data: `show_schedule_${groupId}` }, { text: 'Главное меню', callback_data: `back_main` }],
-                [{ text: 'Актуальные задачи', callback_data: `actual_tasks_${groupId}` }, { text: 'Добавить задачу', callback_data: `add_task_${groupId}` }],
+                [{ text: 'Задачи', callback_data: `actual_tasks_${groupId}` }, { text: 'Добавить задачу', callback_data: `add_task_${groupId}` }],
                 [{ text: 'Добавить учебный предмет', callback_data: `add_subject_${groupId}` }, { text: 'Заявки на задачи для группы', callback_data: `requests_tasks_${groupId}` }],
 				[{ text: 'Список учебных предметов', callback_data: `subject_list_${groupId}` }, { text: 'Заявки на вступление в группу', callback_data: `requests_join_${groupId}` }],
 				[{ text: 'Отправить уведомление группе', callback_data: `send_notification_${groupId}` }, {text: 'Удалить предмет из расписания', callback_data: `delete_subject_from_schedule_${groupId}`}]
@@ -1121,10 +1123,34 @@ const handleShowSchedule = async (chatId, grId) => {
 			let finalText = 'Расписание занятий:\n';
 			for (sub of findAllSubjectsInSchedule) {
 				const subjectNameFinder = await Subjects.findOne({where: {SUBJECT_ID: sub.SUBJECT_ID}});
-				finalText += sub.LESSON_DATE + ' - [' + sub.LESSON_TIME + ']: ' + subjectNameFinder.SUBJECT_NAME + '\n';
+				const date2 = new Date(sub.LESSON_DATE);
+					const year2 = date2.getFullYear();
+					const month2 = String(date2.getMonth() + 1).padStart(2, '0'); // Месяцы в JavaScript начинаются с 0
+					const day2 = String(date2.getDate()).padStart(2, '0');
+				finalText += year2 + '-' + month2 + '-' + day2 + ' - [' + sub.LESSON_TIME + ']\n  ' + subjectNameFinder.SUBJECT_NAME + '\n';
 			}
-			//Здесь FinalText мог бы быть в виде картинки
-			bot.sendMessage(chatId, finalText);
+			bot.sendMessage(chatId, finalText); // Вывод сначала в чате текстом, потом изображением
+			// Создание изображения с текстом расписания
+            const canvas = createCanvas(300, 1000);
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height); // фон белый
+
+            ctx.fillStyle = 'black';
+            ctx.font = '20px Arial';
+            const lines = finalText.split('\n');
+            let y = 30;
+            for (const line of lines) {
+                ctx.fillText(line, 10, y);
+                y += 30;
+            }
+
+            // Сохранение изображения на диск
+            const buffer = canvas.toBuffer('image/png');
+            fs.writeFileSync('./schedule.png', buffer);
+
+            // Отправка изображения пользователю
+            bot.sendPhoto(chatId, './schedule.png', { caption: 'Расписание учебных занятий' });
 		}
 		} catch (error) {
 			console.log('Ошибка при поиске расписания группы');
@@ -1140,13 +1166,39 @@ const userId = await Users.findOne({where: {TELEGRAM_ID: chatId}});
 			bot.sendMessage(chatId, 'Пользователь не найден!');
 		}
 		else {
+			let finalListOfTasks = '';
+			// Функция для создания и отправки изображения
+			const createAndSendImage = async (text, caption) => {
+				const canvas = createCanvas(800, 600); // Задайте размеры вашего изображения
+				const ctx = canvas.getContext('2d');
+				ctx.fillStyle = 'white';
+				ctx.fillRect(0, 0, canvas.width, canvas.height); // Заливаем фон белым цветом
+
+				ctx.fillStyle = 'black';
+				ctx.font = '20px Arial';
+				const lines = text.split('\n');
+				let y = 30;
+				for (const line of lines) {
+					ctx.fillText(line, 10, y);
+					y += 30;
+				}
+
+				// Сохранение изображения на диск (можно сохранить в буфер)
+				const buffer = canvas.toBuffer('image/png');
+				fs.writeFileSync('./tasks.png', buffer);
+
+				// Отправка изображения пользователю
+				bot.sendPhoto(chatId, './tasks.png', { caption });
+			};
 			
 			let tasks = await Tasks.findAll({where: {IS_COMPLETED: false, USER_ID: userId.USER_ID, GROUP_ID: grId, FOR_ALL: false}, order: [['DEADLINE', 'ASC']]});
 			if (tasks.length === 0) {
 				bot.sendMessage(chatId, 'У вас отсутствуют личные задачи');
 			} else {
 				bot.sendMessage(chatId, 'Вывод вашего списка задач\n\n\nВывод вашего списка задач');
+				
 				for (tsk of tasks) {
+					finalListOfTasks += 'Задача "' + tsk.TITLE + '"\n  ' + tsk.DESCRIPTION + '\n\n';
 					bot.sendMessage(chatId, 'Задача "' + tsk.TITLE + '"\n  ' + tsk.DESCRIPTION + '\n', {
 						reply_markup: {
 							inline_keyboard: [
@@ -1159,11 +1211,18 @@ const userId = await Users.findOne({where: {TELEGRAM_ID: chatId}});
 						}
 					});
 				}
+				await createAndSendImage(finalListOfTasks, 'Личные задачи');
 			}
+			
+			//Здесь весь текст задач хранится в переменной finalListOfTasks, нужно его вывести картинкой
+			
+			
 			tasks = await Tasks.findAll({where: {FOR_ALL: true, IS_COMPLETED: false, GROUP_ID: grId}, order: [['DEADLINE', 'ASC']]});
 			if (tasks.length === 0) { bot.sendMessage(chatId, 'Задачи для группы отсутствуют'); showGroupInfo(chatId, grId); return;} else {
 			bot.sendMessage(chatId, 'Вывод списка задач группы\n\n\nВывод списка задач группы');
+			finalListOfTasks = '';
 			for (tsk of tasks) {
+				finalListOfTasks += 'Задача "' + tsk.TITLE + '"\n  ' + tsk.DESCRIPTION + '\n\n';
 				bot.sendMessage(chatId, 'Задача "' + tsk.TITLE + '"\n  ' + tsk.DESCRIPTION + '\n', {
 					reply_markup: {
 						inline_keyboard: [
@@ -1173,6 +1232,9 @@ const userId = await Users.findOne({where: {TELEGRAM_ID: chatId}});
 					}
 				});
 			}
+			
+			//Здесь весь текст задач хранится в переменной finalListOfTasks, нужно его вывести повторно картинкой
+			await createAndSendImage(finalListOfTasks, 'Задачи группы');
 			}
 		}
 };
