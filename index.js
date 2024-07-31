@@ -1169,10 +1169,10 @@ const userId = await Users.findOne({where: {TELEGRAM_ID: chatId}});
 			let finalListOfTasks = '';
 			// Функция для создания и отправки изображения
 			const createAndSendImage = async (text, caption) => {
-				const canvas = createCanvas(800, 600); // Задайте размеры вашего изображения
+				const canvas = createCanvas(800, 600); // Размеры
 				const ctx = canvas.getContext('2d');
 				ctx.fillStyle = 'white';
-				ctx.fillRect(0, 0, canvas.width, canvas.height); // Заливаем фон белым цветом
+				ctx.fillRect(0, 0, canvas.width, canvas.height); // белый цвет фона
 
 				ctx.fillStyle = 'black';
 				ctx.font = '20px Arial';
@@ -1183,11 +1183,11 @@ const userId = await Users.findOne({where: {TELEGRAM_ID: chatId}});
 					y += 30;
 				}
 
-				// Сохранение изображения на диск (можно сохранить в буфер)
+				// Сохранение изображения на диск
 				const buffer = canvas.toBuffer('image/png');
 				fs.writeFileSync('./tasks.png', buffer);
 
-				// Отправка изображения пользователю
+				// Отправка изображения пользователю с тг chatId и текстом caption
 				bot.sendPhoto(chatId, './tasks.png', { caption });
 			};
 			
